@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -41,6 +42,36 @@ class HTTPResult:
 def require(ok, message):
     if not ok:
         raise ValueError(message)
+
+
+def progress(message):
+    """Human-readable progress goes to stderr; never include credentials/argv."""
+    print("[RemoteCode " + time.strftime("%H:%M:%S") + "] " + message, file=sys.stderr, flush=True)
+
+
+@contextmanager
+def activity(label, interval=10):
+    """Show waiting time even when a network/process call produces no output."""
+    started = time.monotonic()
+    stopped = threading.Event()
+    progress(label + "：开始")
+
+    def heartbeat():
+        while not stopped.wait(interval):
+            elapsed = int(time.monotonic() - started)
+            progress(label + f"：仍在处理中，已等待 {elapsed} 秒")
+
+    thread = threading.Thread(target=heartbeat, name="RemoteCodeProgress", daemon=True)
+    thread.start()
+    complete = False
+    try:
+        yield
+        complete = True
+    finally:
+        stopped.set()
+        thread.join()
+        elapsed = int(time.monotonic() - started)
+        progress(label + ("：完成" if complete else "：未完成") + f"，耗时 {elapsed} 秒")
 
 
 def private_dir(path):
@@ -123,10 +154,16 @@ def metadata(url):
 
 
 def download(url, dest, expected, mirror=None):
+    with activity("下载/检查缓存 " + Path(dest).name):
+        return _download(url, dest, expected, mirror)
+
+
+def _download(url, dest, expected, mirror=None):
     """Mirrors affect bytes only. Expected hash must come from trusted metadata/lock."""
     require(re.fullmatch(r"[0-9a-fA-F]{64}", expected or ""), "缺少可信 SHA-256，拒绝下载")
     dest = Path(dest)
     if dest.exists() and sha256(dest) == expected.lower():
+        progress("缓存校验通过，复用 " + dest.name)
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
     candidates = [url]
@@ -161,6 +198,7 @@ def download(url, dest, expected, mirror=None):
                         match = re.fullmatch(r"bytes (\d+)-(\d+)/(\d+)", response.headers.get("Content-Range", ""))
                         require(match and int(match[1]) == offset and int(match[2]) + 1 == int(match[3]), "续传 Content-Range 不匹配")
                         mode = "ab"
+                        progress(f"{dest.name}：从 {offset:,} 字节继续下载")
                     else:
                         require(status == 200, "下载必须返回完整的 200，或有效续传的 206")
                     received = 0
@@ -184,7 +222,7 @@ def download(url, dest, expected, mirror=None):
                 if isinstance(exc, ValueError) or getattr(exc, "code", None) == 416:
                     temp.unlink(missing_ok=True)
                 if attempt == 2:
-                    print(f"下载源失败: {urllib.parse.urlsplit(source).hostname}: {type(exc).__name__}")
+                    progress(f"下载源失败: {urllib.parse.urlsplit(source).hostname}: {type(exc).__name__}")
                 else:
                     time.sleep(1 + attempt)
     if not temp.exists():

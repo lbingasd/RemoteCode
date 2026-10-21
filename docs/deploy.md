@@ -12,6 +12,25 @@ sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc1 --cn
 
 `--cn` 表示选择清华的 apt / Docker CE 软件仓库镜像；不加时使用系统现有 apt 源和 Docker 官方仓库。系统 apt 源不被改写；安装 Docker 时会保留其软件仓库配置供以后维护，不修改 `daemon.json`。执行过程中断后，重跑同一命令即可。
 
+### 进度、日志与命令输入
+
+如果终端停在单独的 `>` 提示符，通常是在等待多行命令输入完成，脚本还没有启动；可按 `Ctrl+C` 取消这条未完成的输入。`>` 提示符不要手工复制进命令；手工输入的 `>` 是输出重定向操作符。为避免复制续行符，推荐直接运行下面这一整行（替换示例 IP）：
+
+```bash
+sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine mac1 --state /opt/remotecode-state --cn
+```
+
+新版启动后立即显示带时间的 `[RemoteCode ...]` 阶段提示：系统与基础工具 → Python → Docker → 云端 1/6 至 6/6。下载会在连接前先输出任务名称，传输时展示分段百分比、已完成/复用段数及合并校验阶段；Python 下载、证书初始化、镜像拉取和服务校验等长任务每 10 秒显示一次仍在等待和已耗时信息。等待提示不是虚构的下载百分比，最终仍需校验通过。apt、curl 和 Docker 原始输出保留。
+
+需要同时查看和保存日志时，在 Bash 中执行：
+
+```bash
+set -o pipefail
+sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine mac1 --state /opt/remotecode-state --cn 2>&1 | tee deploy-cloud.log
+```
+
+Python 输出已禁用缓冲，管道/重定向也能即时看到进展。新增的阶段/等待日志不打印完整命令行、URL 鉴权参数、token 或密码；外部工具保留自身输出。提交排障信息时仅提供最后几行普通错误日志，不公开配对文件或 `url --show-secrets` 的输出。缺少 `--ip` 会在依赖安装前立即报错。
+
 脚本会下载并校验 frp，生成个人 CA 和 IP 证书，注册机器，拉取并锁定 nginx 镜像 digest，检查配置后启动。默认 state 为工具包内的 `state/cloud`；建议长期部署时明确指定稳定的绝对路径：
 
 ```bash

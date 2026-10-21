@@ -5,7 +5,7 @@ import re
 import shutil
 import threading
 import time
-from common import read, request, require, sha256, write
+from common import activity, progress, read, request, require, sha256, write
 
 
 def content_range(response, start, end, total=None):
@@ -20,11 +20,17 @@ def content_range(response, start, end, total=None):
 
 
 def segmented_download(url, dest, expected, mirror=None, workers=8, chunk_size=1024 * 1024):
+    with activity("分段下载/检查缓存 " + Path(dest).name):
+        return _segmented_download(url, dest, expected, mirror, workers, chunk_size)
+
+
+def _segmented_download(url, dest, expected, mirror=None, workers=8, chunk_size=1024 * 1024):
     require(re.fullmatch(r"[a-fA-F0-9]{64}", expected or ""), "需要可信 SHA-256")
     require(1 <= workers <= 16 and 65536 <= chunk_size <= 16 * 1024 * 1024, "并发或分段大小超出范围")
     expected = expected.lower()
     dest = Path(dest)
     if dest.is_file() and sha256(dest) == expected:
+        progress("缓存校验通过，复用 " + dest.name)
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
     parts = dest.with_name(dest.name + ".chunks")
@@ -48,7 +54,7 @@ def segmented_download(url, dest, expected, mirror=None, workers=8, chunk_size=1
             write(manifest, identity)
             count = (total + chunk_size - 1) // chunk_size
             print(f"分段下载: {total:,} 字节，{count} 段，{workers} 并发", flush=True)
-            counter = [0, 0]
+            counter = [0, 0, time.monotonic()]
             mutex = threading.Lock()
 
             def fetch(index):
@@ -105,8 +111,10 @@ def segmented_download(url, dest, expected, mirror=None, workers=8, chunk_size=1
                 with mutex:
                     counter[0] += 1
                     counter[1] += int(cached)
-                    if counter[0] % 20 == 0 or counter[0] == count:
-                        print(f"完成 {counter[0]}/{count} 段（复用 {counter[1]} 段）", flush=True)
+                    now = time.monotonic()
+                    if counter[0] == 1 or counter[0] == count or now - counter[2] >= 2:
+                        progress(f"分段进度 {counter[0] * 100 / count:.1f}%：{counter[0]}/{count} 段（复用 {counter[1]} 段）")
+                        counter[2] = now
 
             with ThreadPoolExecutor(max_workers=workers) as pool:
                 futures = [pool.submit(fetch, index) for index in range(count)]
@@ -118,6 +126,7 @@ def segmented_download(url, dest, expected, mirror=None, workers=8, chunk_size=1
                         future.cancel()
                     raise
             temp = dest.with_name(dest.name + ".part")
+            progress("合并分段并核对完整 SHA-256：" + dest.name)
             with temp.open("wb") as output:
                 for index in range(count):
                     with (parts / f"{index:06d}.bin").open("rb") as chunk:

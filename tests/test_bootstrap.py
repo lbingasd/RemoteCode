@@ -52,6 +52,9 @@ class BootstrapTests(unittest.TestCase):
             result = subprocess.run(["bash", str(PACKAGE / "deploy-local.sh"), *args], capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("RemoteCode:", result.stderr)
+        result = subprocess.run(["bash", str(PACKAGE / "deploy-cloud.sh"), "install"], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requires --ip", result.stderr)
 
 
 if __name__ == "__main__":

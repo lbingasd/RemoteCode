@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Sourced by the two entrypoints. No persistent shell profile or apt mirror edits.
 rc_die() { echo "RemoteCode: $*" >&2; exit 1; }
+rc_log() { printf '[RemoteCode %s] %s\n' "$(date '+%H:%M:%S')" "$*" >&2; }
 rc_as_root() {
     if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo -- "$@"; fi
 }
@@ -15,12 +16,14 @@ rc_python() {
     return 1
 }
 rc_ensure_linux_python() {
-    if rc_python; then return; fi
+    rc_log '[依赖 2/3] 检查 Python 3.12+'
+    if rc_python; then rc_log "Python 已就绪: $RC_PYTHON"; return; fi
+    rc_log '系统 Python 较旧，正在引导私有 Python；首次连接和下载可能需要等待'
     # Use the old system interpreter only to fetch a private, version-locked one.
     python3 -c 'import sys; sys.exit(sys.version_info < (3,8))' >/dev/null 2>&1 || rc_die 'Private bootstrap needs system Python 3.8+ (Ubuntu 20.04+/Debian 11+).'
     local python_args=(--prefix "$RC_PACKAGE/.bootstrap/python" --cache "$RC_DOWNLOAD_CACHE/bootstrap")
     [ -z "$RC_DOWNLOAD_MIRROR" ] || python_args+=(--mirror "$RC_DOWNLOAD_MIRROR")
-    python3 "$RC_PACKAGE/scripts/bootstrap-python.py" "${python_args[@]}"
+    PYTHONUNBUFFERED=1 python3 "$RC_PACKAGE/scripts/bootstrap-python.py" "${python_args[@]}"
     rc_python || rc_die 'Private Python bootstrap failed; cached downloads are retained.'
 }
 rc_apt() {
@@ -52,9 +55,11 @@ rc_apt() {
     fi
 }
 rc_docker() {
+    rc_log '[依赖 3/3] 检查 Docker Engine 和 Compose'
     if command -v docker >/dev/null 2>&1; then
         docker compose version >/dev/null 2>&1 || rc_die 'Existing Docker has no Compose plugin. Install its matching plugin; existing Docker packages will not be replaced.'
     else
+        rc_log '准备 Docker 软件源与安装包；下方显示 apt/curl 原始进度'
         # Do not remove a competing container runtime on the user's behalf.
         local pkg installed repo key list
         for pkg in docker.io podman-docker containerd runc; do
@@ -80,11 +85,12 @@ rc_docker() {
         rc_as_root apt-get -o Acquire::Retries=3 update
         rc_as_root apt-get -o Acquire::Retries=3 install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     fi
+    rc_log '启动 Docker 并检查引擎连接'
     if command -v systemctl >/dev/null 2>&1; then rc_as_root systemctl enable --now docker; fi
     docker info >/dev/null || rc_die 'Docker daemon is unavailable. Cloud entrypoint must run with Docker access.'
 }
 rc_bootstrap() {
-    local role="$1" action arg skip=0 help=0 system brewbin accepted=0 agents=1 previous=''
+    local role="$1" action arg skip=0 help=0 system brewbin accepted=0 agents=1 previous='' address=''
     shift
     action=${1:-}
     RC_CN=0
@@ -93,15 +99,17 @@ rc_bootstrap() {
     for arg in "$@"; do
         if [ "$previous" = --mirror ]; then RC_DOWNLOAD_MIRROR="$arg"; previous=''; continue; fi
         if [ "$previous" = --cache ]; then RC_DOWNLOAD_CACHE="$arg"; previous=''; continue; fi
+        if [ "$previous" = --ip ]; then address="$arg"; previous=''; continue; fi
         case "$arg" in
             --cn) RC_CN=1 ;;
             --skip-deps|--offline) skip=1 ;;
             -h|--help) help=1 ;;
             --accept-license) accepted=1 ;;
             --no-agents) agents=0 ;;
-            --mirror|--cache) previous="$arg" ;;
+            --mirror|--cache|--ip) previous="$arg" ;;
             --mirror=*) RC_DOWNLOAD_MIRROR=${arg#--mirror=} ;;
             --cache=*) RC_DOWNLOAD_CACHE=${arg#--cache=} ;;
+            --ip=*) address=${arg#--ip=} ;;
         esac
     done
     [ -z "$previous" ] || rc_die "$previous requires a value."
@@ -116,6 +124,10 @@ rc_bootstrap() {
         exit 0
     fi
     case "$action" in install|status|uninstall) ;; *) rc_die 'First argument must be install, status or uninstall. Use --help.' ;; esac
+    if [ "$role" = cloud ] && [ "$action" = install ] && [ -z "$address" ]; then
+        rc_die 'Cloud install requires --ip IPv4. Do not paste the shell > prompt into the command.'
+    fi
+    rc_log "开始 ${role} / ${action}；正在检查系统和依赖"
     if [ "$role" = local ] && [ "$action" = install ] && [ "$accepted" -eq 0 ]; then
         rc_die 'Read the Microsoft VS Code Server license and explicitly pass --accept-license.'
     fi
@@ -129,11 +141,13 @@ rc_bootstrap() {
     fi
     # Uninstall/status/help never install packages, fetch assets, or change apt sources.
     if [ "$action" != install ] || [ "$skip" -eq 1 ]; then
+        rc_log '跳过系统依赖安装，查找已有 Python'
         rc_python || rc_die 'Python 3.12+ required. Set REMOTECODE_PYTHON or install Python first.'
         return
     fi
     case "$system" in
         Linux)
+            rc_log '[依赖 1/3] 检查 Linux 系统、CA 和基础工具'
             [ -r /etc/os-release ] || rc_die 'Missing /etc/os-release; preinstall dependencies and use --skip-deps.'
             . /etc/os-release
             case "$ID" in ubuntu|debian) ;; *) rc_die 'Auto dependencies support Ubuntu/Debian. Other distributions: preinstall Python 3.12+, curl, Git/Docker and use --skip-deps.' ;; esac
@@ -151,6 +165,7 @@ rc_bootstrap() {
                 command -v git >/dev/null 2>&1 || packages+=(git)
             fi
             if [ "${#packages[@]}" -gt 0 ]; then
+                rc_log "需要安装基础工具: ${packages[*]}；下方显示 apt 原始进度"
                 rc_apt update
                 rc_apt install -y "${packages[@]}"
             fi
@@ -158,6 +173,7 @@ rc_bootstrap() {
             [ "$role" != cloud ] || rc_docker
             ;;
         Darwin)
+            rc_log '检查 macOS 的 Python、Node.js 和 Git'
             # A complete existing toolchain does not require installing Homebrew.
             if rc_python; then
                 if [ "$agents" -eq 0 ]; then return; fi

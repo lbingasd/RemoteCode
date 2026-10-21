@@ -145,3 +145,13 @@ python3 -m unittest discover -s tests -p 'test_python_bootstrap.py'
 python3 -m unittest discover -s tests -p 'test_bootstrap.py'
 bash -n scripts/bootstrap-posix.sh
 ```
+
+## 部署进度与等待输出修复（2026-10-21）
+
+原入口没有统一的阶段提示，下载在首次 Range 响应前也没有输出，完成分段通常累计到 20 段才显示；Python 输出进入管道时还可能被缓冲。现增加启动/依赖日志、云端六个阶段、网络/镜像/证书/服务操作的每 10 秒等待提示、按时间节流的分段百分比、缓存复用与完整文件合并校验提示。Python 入口和子进程禁用缓冲，日志可即时通过 `2>&1 | tee` 保存。
+
+补充区分终端的 `>` 续行提示与手动输入的重定向操作符；缺少 `--ip` 时在系统依赖安装前退出。Mac Bash 3.2 的日志变量使用花括号，避免中文标点紧邻变量时被错误解析。
+
+本次 **38 项定向检查通过**：4 项新进度检查、10 项传输检查、14 项部署编排检查、1 项下载完整性检查、2 项入口检查、7 项旧 Python 引导检查。另通过 PowerShell 解析及 5 个 Windows 参数引号用例；使用 Python 3.11 实际演示等待心跳和已校验 Linux Python 缓存复用。未重跑无关的完整原生链路、未连接用户云端或执行 Ubuntu/Docker 部署。[记录](evidence/progress-checks.json)
+
+新增等待日志不打印完整命令行、下载 URL 中的鉴权内容或异常中的潜在秘密；异常路径会停止心跳并显示“未完成”，不会显示成功。源有完整性校验失败时仍拒绝安装，不因增加进度展示改变校验/续传规则。

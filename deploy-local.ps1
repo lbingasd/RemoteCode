@@ -113,7 +113,8 @@ try {
         }
     }
     if (-not $Python) { throw 'Python 3.12+ required. Set REMOTECODE_PYTHON to its absolute python.exe path.' }
-    $Arguments = @((Join-Path $PSScriptRoot 'scripts\setup.py'), 'local', $Action.ToLowerInvariant(), '--root', $Root, '--cache', $Cache, '--workers', "$Workers")
+    $env:PYTHONUNBUFFERED = '1'
+    $Arguments = @('-u', (Join-Path $PSScriptRoot 'scripts\setup.py'), 'local', $Action.ToLowerInvariant(), '--root', $Root, '--cache', $Cache, '--workers', "$Workers")
     $Values = @{
         '--bundle'=$Bundle; '--workspace'=$Workspace; '--lock'=$Lock; '--mirror'=$Mirror; '--registry'=$Registry
         '--vsix'=$Vsix; '--vsix-sha256'=$VsixSha256; '--nssm-path'=$NssmPath; '--nssm-sha256'=$NssmSha256

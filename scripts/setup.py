@@ -13,7 +13,7 @@ import tarfile
 import tempfile
 import time
 
-from common import download, extract, identifier, metadata, read, request, require, run, sha256, write
+from common import activity, download, extract, identifier, metadata, progress, read, request, require, run, sha256, write
 from local import host_platform, validate_pair
 from transfer import segmented_download
 
@@ -114,7 +114,8 @@ def select_lock(args, target, platform_name, local=False):
             chosen = args.cache / filename
             if not chosen.exists():
                 require(not args.offline, "此架构没有随包 lock；离线前用 download.py resolve 生成并通过 --lock 提供")
-                script("download.py", "resolve", "--platform", platform_name, "--lock", chosen)
+                with activity("从官方元数据解析并锁定程序版本"):
+                    script("download.py", "resolve", "--platform", platform_name, "--lock", chosen)
     lock = read(chosen)
     require(lock["platform"] == platform_name, "下载 lock 与目标系统/架构不一致")
     return chosen
@@ -137,12 +138,15 @@ def cloud_setup(args, root):
     address = ipaddress.ip_address(args.ip)
     require(address.version == 4, "当前入口支持公网 IPv4")
     require(sys.platform.startswith("linux"), "一键云端部署请在 Linux 或 Linux VM 内运行")
+    progress("[云端 1/6] 检查 Docker 引擎和目标架构")
     require(shutil.which("docker") and shutil.which("openssl"), "缺少 Docker/OpenSSL；取消 --skip-deps 或预先安装")
-    info = subprocess.check_output(["docker", "info", "--format", "{{.OSType}}/{{.Architecture}}"], text=True).strip()
+    with activity("读取 Docker 引擎信息"):
+        info = subprocess.check_output(["docker", "info", "--format", "{{.OSType}}/{{.Architecture}}"], text=True).strip()
     arch = "arm64" if "arm64" in info or "aarch64" in info else "amd64"
     require(info.startswith("linux/"), "需要 Linux 容器")
     statefile = root / "state.json"
     if statefile.is_file():
+        progress("[云端 2/6] 复用已安装的 frp 和云端状态")
         state = read(statefile)
         require(state["ip"] == str(address), "公网 IP 与现有部署不同；不会替换证书或现有配对")
         if args.cert or args.key:
@@ -151,6 +155,7 @@ def cloud_setup(args, root):
         if args.lock:
             require(read(args.lock)["frp_version"] == state["frp_version"], "现有 frps 版本与 lock 不同；不会隐式升级")
     else:
+        progress("[云端 2/6] 准备 frp 安装包；连接、续传与校验进度如下")
         require(not root.exists() or not any(root.iterdir()), "初始化目录非空，拒绝覆盖")
         lockfile = select_lock(args, root, "linux-" + arch)
         fetch_item(read(lockfile)["files"]["frp"], args.cache, args)
@@ -158,14 +163,17 @@ def cloud_setup(args, root):
         if args.cert or args.key:
             require(args.cert and args.key, "--cert/--key 必须同时提供")
             extra += ["--cert", args.cert.resolve(), "--key", args.key.resolve()]
-        script("cloud.py", "--state", root, "init", "--ip", address,
-               "--lock", lockfile, "--cache", args.cache, *extra)
+        with activity("初始化网关配置和证书"):
+            script("cloud.py", "--state", root, "init", "--ip", address,
+                   "--lock", lockfile, "--cache", args.cache, *extra)
         state = read(statefile)
+    progress("[云端 3/6] 检查/注册设备 " + args.machine)
     if not any(m["id"] == args.machine for m in state["machines"]):
         script("cloud.py", "--state", root, "add", args.machine)
     else:
         print(f"机器 {args.machine} 已注册，保留现有密码和隧道密钥。")
     state = read(statefile)
+    progress("[云端 4/6] 检查 nginx 镜像缓存和固定版本")
     # A pinned image already present locally needs neither registry access nor an update.
     image = state["image"]
     present = subprocess.run(["docker", "image", "inspect", image], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
@@ -182,10 +190,12 @@ def cloud_setup(args, root):
         extra = ["--offline"] if args.offline else []
         if args.image and "@sha256:" not in state["image"]:
             extra += ["--image", args.image]
-        script("cloud.py", "--state", root, "pull", *extra)
+        with activity("获取并锁定 nginx 镜像；Docker 输出如下"):
+            script("cloud.py", "--state", root, "pull", *extra)
     # Unchanged reruns preserve open sessions. Any externally changed credentials,
     # config/cert/binary force the low-level up, which revokes existing sessions.
     import hashlib
+    progress("[云端 5/6] 校验配置并启动网关容器")
     fingerprint = hashlib.sha256()
     for path in sorted([root / "compose.json", *root.joinpath("live").rglob("*"),
                         *root.joinpath("certs").rglob("*"), root / "bin/frps"]):
@@ -194,13 +204,15 @@ def cloud_setup(args, root):
             fingerprint.update(bytes.fromhex(sha256(path)))
     digest = fingerprint.hexdigest()
     previous = read(root / "setup.json") if (root / "setup.json").exists() else {}
-    if previous.get("applied") == digest:
-        import cloud
-        script("cloud.py", "--state", root, "check")
-        cloud.compose(root, "up", "-d", "--remove-orphans")
-    else:
-        script("cloud.py", "--state", root, "up")
-        write(root / "setup.json", {"applied": digest})
+    with activity("校验 nginx/frps 并启动服务"):
+        if previous.get("applied") == digest:
+            import cloud
+            script("cloud.py", "--state", root, "check")
+            cloud.compose(root, "up", "-d", "--remove-orphans")
+        else:
+            script("cloud.py", "--state", root, "up")
+            write(root / "setup.json", {"applied": digest})
+    progress("[云端 6/6] 显示容器状态和配对目录")
     script("cloud.py", "--state", root, "status")
     print(f"云端完成。将 {root / 'enrollment' / args.machine} 安全复制到对应家庭电脑。")
     print(f"iPad 公共根证书: {root / 'pki/root-ca.crt'}；CA 私钥不外传。")

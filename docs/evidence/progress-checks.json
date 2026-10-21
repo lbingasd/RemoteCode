@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "date": "2026-10-21",
+  "targeted_tests": {
+    "new": 4,
+    "transfer": 10,
+    "setup": 14,
+    "integrity": 1,
+    "bootstrap": 2,
+    "python": 7
+  },
+  "targeted_tests_total": 38,
+  "checks": [
+    "timestamped startup and prerequisite logs",
+    "cloud six-stage output",
+    "heartbeat before/surrounding silent network and process work",
+    "segment completion percentage and cache reuse",
+    "heartbeat thread cleanup on success/failure",
+    "no URL token or exception detail in activity logs",
+    "unbuffered Python in POSIX and Windows entrypoints",
+    "missing cloud IP rejected before dependencies",
+    "Python 3.11 real cached Linux archive reuse display",
+    "PowerShell parser and five Windows argv quoting cases"
+  ],
+  "ubuntu_or_docker_executed": false,
+  "real_model_requests": 0
+}

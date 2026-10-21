@@ -14,7 +14,7 @@ import sys
 import tarfile
 import tempfile
 
-from common import download, read, require, sha256, write
+from common import activity, download, progress, read, require, sha256, write
 from transfer import segmented_download
 
 PACKAGE = Path(__file__).resolve().parent.parent
@@ -91,12 +91,14 @@ def _install(prefix, cache, item, mirror=None):
     binary = prefix / "bin/python3"
     identity = {"archive_sha256": item["sha256"], "name": item["name"]}
     if (prefix / "remotecode-python.json").is_file():
+        progress("私有 Python 已安装，检查现有运行时")
         require(read(prefix / "remotecode-python.json") == identity, "现有私有 Python 版本不同，不会自动替换")
         probe(binary)
         return binary
     require(not prefix.exists() or not any(prefix.iterdir()), "私有 Python 目录非空且没有有效安装记录，请检查后移走该目录再重跑")
     require(Path(item["name"]).name == item["name"], "Python 缓存文件名不合法")
     archive = cache / item["name"]
+    progress("[Python 1/3] 准备已锁定的 Python 安装包")
     try:
         segmented_download(item["url"], archive, item["sha256"], mirror, workers=8)
     except RuntimeError:
@@ -105,9 +107,11 @@ def _install(prefix, cache, item, mirror=None):
     require(sha256(archive) == item["sha256"].lower(), "Python 安装包校验失败")
     with tempfile.TemporaryDirectory(prefix=".python-install-", dir=str(prefix.parent)) as folder:
         stage = Path(folder)
-        extract_runtime(archive, stage)
+        with activity("[Python 2/3] 解压私有解释器"):
+            extract_runtime(archive, stage)
         runtime = stage / "python"
-        probe(runtime / "bin/python3")
+        with activity("[Python 3/3] 验证解释器和 SSL 模块"):
+            probe(runtime / "bin/python3")
         write(runtime / "remotecode-python.json", identity)
         if prefix.exists():
             require(not any(prefix.iterdir()), "安装期间目标被写入，拒绝覆盖")
