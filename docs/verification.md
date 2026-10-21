@@ -242,3 +242,15 @@ python3 tests/integration_setup.py --cache downloads \
 # 独立回退分支浏览器夹具，生成后仅通过 loopback HTTP 提供。
 python3 tests/webview_layout_fixture.py --output /临时夹具目录
 ```
+
+## DeepSeek Key 验证与本机更新工具（2026-10-22）
+
+ACP 已连接且聊天面板恢复后，Claude 请求仍长时间等待。读取对应 ACP 日志，确认请求已进入适配器；本机 Claude 配置实际指向 DeepSeek 官方 Anthropic 兼容入口。最小 API 请求返回 HTTP 401，错误类型为 `authentication_error`，说明配置的 Key 无效。正常 CLI 与禁用 Hooks/MCP 的隔离 CLI 均连续收到 401，并出现多次重试，解释了前端持续加载。诊断仅发送固定测试文本，不传项目内容；没有取得成功的模型回复。测试进程已退出，原始诊断日志和凭据均未纳入仓库。
+
+用户选择继续使用 DeepSeek，已在本机通过隐藏输入脚本更新 Key，并回复“验证通过”。此确认覆盖 Key 验证与配置更新，不等于模型回复或 ACP 编辑任务验收。正式工具为 `scripts/update-deepseek-key.py`，使用[官方模型列表接口](https://api-docs.deepseek.com/api/list-models/)进行认证检查；现有兼容入口依据 [DeepSeek 官方 Claude Code 接入说明](https://api-docs.deepseek.com/quick_start/agent_integrations/claude_code/)。
+
+新增 **8 项定向检查通过**，覆盖无效 Key 不写入、仅更新凭据并保留原始备份、Mac/Linux 文件权限、两处并发修改保护、其他服务地址和冲突认证拒绝、Key 仅通过 curl stdin 传入、错误不回显 Key 及非交互入口拒绝。测试全部使用虚构 Key 与网络夹具；没有再次使用真实 Key 请求模型。部署包包含脚本、测试和说明，不包含配置、备份或诊断日志。
+
+```bash
+python3 -m unittest discover -s tests -p 'test_deepseek_key.py'
+```

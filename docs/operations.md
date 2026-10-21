@@ -111,6 +111,7 @@ python3 scripts/webview_compat.py restore --root "$HOME/RemoteCode"
 | 502 | 家庭电脑是否在线；frpc 认证/重连；IDE 是否监听 127.0.0.1；nginx 对应 loopback 转发端口是否存在 |
 | frpc TLS 错误 | 配对 CA、`serverName` 内部标签、云端隧道证书和 IP；不要关闭验证 |
 | 网页开了但终端/ACP 不工作 | 检查 WebSocket、扩展版本、适配器依赖、GUI PATH 与绝对路径、CLI 登录、模型服务网络 |
+| Claude 已连接、消息长时间转圈 | 检查实际配置的模型服务和认证；Claude 客户端可被配置为 DeepSeek 等兼容服务，连接适配器成功不代表 API Key 有效。实测无效 DeepSeek Key 返回 401 后 CLI 仍会多次重试。继续用 DeepSeek 时，在家庭电脑运行 `python3 scripts/update-deepseek-key.py` 隐藏输入有效 Key，再断开、重连并新建 ACP 会话。 |
 | ACP 视图空白或长时间加载 | Safari 18.5 已启动却空白时，先更新工具包并在家庭电脑应用上述布局兼容补丁；其他启动失败仍需检查 `*.vscode-cdn.net`、安全上下文和 Service Worker。完整安装包不代表浏览器资源全部离线可用。 |
 | Windows 重启后不可达 | IDE 是否只是登录触发；Headless 账号密码/登录权限；磁盘解锁、休眠；NSSM 服务状态 |
 | Mac 注销后不可达 | LaunchAgents 生命周期；FileVault；电源休眠策略 |

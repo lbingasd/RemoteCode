@@ -192,6 +192,14 @@ python3 scripts/local.py --root "$HOME/RemoteCode" url --show-secrets
 
 若 Python 没在 PATH，用入口检查到的解释器路径或 Windows `py -3`。只在自己终端查看首次 token 链接和 Basic Auth 密码，不公开转发。优先在家庭电脑完成 OAuth，避免 iPad 的 localhost 回调指向错误设备。
 
+若已有 Claude 配置使用 DeepSeek 官方兼容接口（`ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic`），更新 Key 可在家庭电脑的交互终端运行：
+
+```bash
+python3 scripts/update-deepseek-key.py
+```
+
+输入隐藏，Key 不放在命令行参数中。脚本先通过官方 `/models` 接口验证，有效才备份并仅更新 `~/.claude/settings.json` 的 `env.ANTHROPIC_AUTH_TOKEN`；其他设置和模型名保留。无效 Key、网络失败、其他服务地址、认证来源冲突或并发配置修改会停止。备份也含凭据，需留在本机；Mac/Linux 文件权限为 600。自定义配置路径可用 `--settings /实际/settings.json`。更新后在 iPad 停止旧请求、断开并重连 **Claude (local ACP)**，再新建会话测试。工具在 Mac 已验证；Windows 凭据文件仍应按当前用户 ACL 管理，不能用 POSIX 权限检查替代 Windows 验收。
+
 将 `root-ca.crt` 公共证书传给 iPad，安装描述文件，再到“设置 → 通用 → 关于本机 → 证书信任设置”开启完全信任。使用首次 token 链接访问、输入 Basic Auth 后，收藏不含 token 的 `https://IP/m/pc1/`。如果初始化时用 `--cert/--key` 提供浏览器信任的公网 IP 证书，可省略浏览器的私人 CA 信任步骤。
 
 在左侧 **ACP Client → Agents** 中找到 **Codex (local ACP)** 或 **Claude (local ACP)**，点对应行右侧的插头连接；只展开 agent 行不会建立连接。命令面板也可执行 **ACP: Connect to Agent**。随后执行 **ACP: Open Chat Panel**，在 ACP 自己的 Chat 面板发送任务；右侧 VS Code 内置 Copilot Chat 是另一个入口，这条链路无需登录 Copilot。不要选择扩展自带的旧版默认 `Codex CLI` 配置。

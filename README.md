@@ -97,6 +97,7 @@ Mac/Linux 本机对应 `bash deploy-local.sh install --bundle ./mac1 --workspace
 | [local-service.py](scripts/local-service.py) | macOS LaunchAgents / Linux systemd 用户服务 |
 | [agents.py](scripts/agents.py) | 本机 CLI/ACP 依赖安装、版本锁、启动与设置生成 |
 | [webview_compat.py](scripts/webview_compat.py) | Safari 无 CSS 锚点时的 WebView 布局回退，校验版本并支持恢复原文件 |
+| [update-deepseek-key.py](scripts/update-deepseek-key.py) | 本机隐藏输入并验证 DeepSeek Key，备份后仅更新 Claude 中已有的对应凭据 |
 
 已在当前 Mac 实测完整安装包下载、真实 nginx/frp/双 IDE 链路、浏览器终端与 ACP 视图、CLI 和 ACP 初始化、LaunchAgents 生命周期及清理。正式 Mac 已部署；用户已在 iPad 确认两个本机 agent 可连接。随后根据 Safari 18.5 真机日志定位并应用 WebView 布局兼容补丁，浏览器回退分支已验证；用户已在 iPad 重新打开后确认欢迎界面和输入框均出现。已只读验证现有云入口返回修复文件，未通过工具修改云服务。**Windows 服务、Docker 目标机生命周期与真实模型任务仍需分别验收，详见验证记录。**
 
