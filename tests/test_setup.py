@@ -22,6 +22,12 @@ def options(role, action="install", *extra):
 
 
 class SetupTests(unittest.TestCase):
+    def setUp(self):
+        # Port ownership is exercised separately without inspecting this host's Docker.
+        guard = patch.object(setup, "preflight_port")
+        guard.start()
+        self.addCleanup(guard.stop)
+
     def test_private_node_npm_remains_usable_without_shell_path_changes(self):
         with tempfile.TemporaryDirectory() as folder:
             prefix = Path(folder).resolve() / "tools/node"

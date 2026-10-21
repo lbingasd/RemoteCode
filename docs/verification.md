@@ -196,3 +196,17 @@ python3 -m unittest discover -s tests -p 'test_mirrors.py' -v
 ```bash
 python3 -m unittest discover -s tests -p 'test_container_images.py' -v
 ```
+
+## 云端 443 占用预检（2026-10-21）
+
+用户已在目标 Ubuntu 上用 `ss` 确认宿主机 nginx 同时监听 IPv4/IPv6 的 443，并确认没有其他用途，可由 RemoteCode 独占该端口。给出的处理方式是显式停止并禁用宿主机 nginx，保留已有 state 后续装；未通过工具连接或停止用户服务器的服务。
+
+新增 `cloud_ports.py` 在安装早期和底层 `up` 前检查监听与 Docker 端口映射。Docker 查询只读取容器 ID、名称、发布端口及特定 Compose 标签，不读取 Env/完整 inspect。通过项目名、edge 服务和 state 工作目录识别自己的容器，避免重跑误报；其他容器的端口即使没有 userland-proxy 监听也会阻止继续。宿主机占用由只读 `ss`/`lsof` 和绑定探测检查，不自动停止任何服务。没有监听却处于内核暂留状态、或非 root 无绑定权限时，交由 Docker 作最终校验。容器格式依据 [Docker 官方 ps 格式说明](https://docs.docker.com/reference/cli/docker/container/ls/)。
+
+本次 **36 项定向检查通过**：9 项端口预检、14 项编排、11 项容器镜像、2 项相关 Compose 生成/项目隔离。当前 Mac 实际创建 loopback 随机高端口监听，验证预检拒绝、原监听仍可连接、关闭后检查可继续；同时验证自己的已运行 edge、外部容器、相同项目不同 state、首次冲突不下载/不初始化、底层 up 冲突不重建、status/down/check 不要求端口空闲。初次运行受沙箱绑定限制，放行本机临时测试后发现并修正了 BSD 地址复用及测试断言兼容问题，最终上述范围全部通过。
+
+没有占用真实 443、没有停止本机/云端 nginx、没有执行真实 Docker Engine 生命周期。Docker 元数据为夹具，Linux 上真实端口/标签查询和目标部署仍待重跑确认。[记录](evidence/port-preflight.json)
+
+```bash
+python3 -m unittest discover -s tests -p 'test_cloud_ports.py' -v
+```

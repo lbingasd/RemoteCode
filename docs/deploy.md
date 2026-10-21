@@ -10,6 +10,21 @@
 sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc1 --cn
 ```
 
+### 443 已被 nginx 或其他服务占用
+
+云端入口需要独占宿主机 TCP 443。脚本会在核心程序下载/初始化前、容器启动前检查监听和 Docker 发布端口，提示占用者；同一 state 的已运行 edge 容器允许重跑，不会把它误认为其他部署。脚本不自动停止现有服务，也不更换公网端口。
+
+先用 `sudo ss -ltnp 'sport = :443'` 确认占用者。如果已确认宿主机 nginx 不再承载其他网站/面板，可停止并关闭其开机启动，再重跑原安装命令：
+
+```bash
+sudo systemctl disable --now nginx
+sudo ss -ltnp 'sport = :443'
+```
+
+第二条此时应没有 nginx 的 LISTEN 记录。保留原 state、证书、配对包和下载缓存，直接续装。其他服务仍需要保留时，当前脚本不会自动整合既有入口，不能直接停止它；应先规划统一反代或独立入口 IP。若占用者是其他 Docker 容器，按其项目管理方式处理，不执行全局停止/prune。
+
+宿主机 nginx 的停用由你显式执行，RemoteCode 卸载不会自动恢复它。以后卸载 RemoteCode 并确认 443 空闲后，可用 `sudo systemctl enable --now nginx` 恢复。预检和实际 Docker 绑定之间仍存在时间窗口，最终以 Docker 启动结果为准。
+
 `--cn` 表示选择清华的 apt / Docker CE 软件仓库镜像；不加时使用系统现有 apt 源和 Docker 官方仓库。系统 apt 源不被改写；安装 Docker 时会保留其软件仓库配置供以后维护，不修改 `daemon.json`。执行过程中断后，重跑同一命令即可。
 
 已有 Docker 但缺少 Compose 时，自动补装官方独立 CLI 插件到 `/usr/local/lib/docker/cli-plugins/docker-compose`，不替换 Docker、containerd 或现有容器。插件固定为 Compose 5.6.1（兼容这里使用的 Compose v2 命令接口），x64/ARM64 的官方 SHA-256 记录在 `examples/compose-plugin.lock.json`；支持下载续传、`--cache` 和 `--mirror`。已有可用 Compose 直接复用；已有不可用的同路径文件或符号链接不会被覆盖，需先检查其来源。自有 `DOCKER_CONFIG/cli-plugins` 中的坏插件可能遮挡系统插件，可用 `docker --help` 查看 Invalid Plugins 并处理对应文件。

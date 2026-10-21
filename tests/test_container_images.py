@@ -130,7 +130,7 @@ class ContainerImageTests(unittest.TestCase):
                     state["image"] = "m.daocloud.io/docker.io/library/nginx@" + DIGEST
                     common.write(root / "state.json", state)
 
-            with patch.object(setup.sys, "platform", "linux"), patch.object(setup.shutil, "which", return_value="/tool"), patch.object(setup.subprocess, "check_output", return_value="linux/x86_64"), patch.object(setup.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)), patch.object(setup, "script", side_effect=execute) as call:
+            with patch.object(setup, "preflight_port"), patch.object(setup.sys, "platform", "linux"), patch.object(setup.shutil, "which", return_value="/tool"), patch.object(setup.subprocess, "check_output", return_value="linux/x86_64"), patch.object(setup.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)), patch.object(setup, "script", side_effect=execute) as call:
                 setup.cloud_setup(args, root)
             self.assertIn(("cloud.py", "--state", root, "pull", "--cn"), [c.args for c in call.call_args_list])
             self.assertTrue(all("init" not in c.args and "add" not in c.args and "rotate" not in c.args for c in call.call_args_list))

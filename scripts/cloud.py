@@ -13,6 +13,7 @@ import sys
 import tempfile
 from common import extract, identifier, private_dir, read, require, run, sha256, write
 from container_images import pull_image
+from cloud_ports import preflight_port
 
 
 def compose(root, *args, **kwargs):
@@ -327,6 +328,8 @@ def main():
         print("镜像已固定到 digest。离线云端可在其他机器 docker save/load 同一镜像。")
     elif args.action in ("check", "up"):
         require("@sha256:" in state["image"], "先 pull 将镜像锁定到 digest")
+        if args.action == "up":
+            preflight_port(root, state)
         compose(root, "config", "--quiet")
         compose(root, "run", "--rm", "--no-deps", "edge", "-t", "-c", "/state/nginx.conf")
         # A throwaway container verifies every frps config without opening any public ports.
@@ -336,6 +339,7 @@ def main():
                  "-v", f"{root / 'live/frps'}:/configs:ro", state["image"],
                  "verify", "-c", f"/configs/{machine['id']}.toml"])
         if args.action == "up":
+            preflight_port(root, state)
             # Force recreation also tears down already-upgraded websocket sessions after revocation.
             compose(root, "up", "-d", "--force-recreate", "--remove-orphans")
     elif args.action == "renew-cert":

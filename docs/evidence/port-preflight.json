@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-21",
+  "host": "macOS x86_64",
+  "reported_target_conflict": "Ubuntu host nginx listens on IPv4/IPv6 TCP 443; user confirmed unused",
+  "targeted_tests": {
+    "status": "PASS",
+    "count": 36,
+    "port_preflight": 9,
+    "orchestration": 14,
+    "container_images": 11,
+    "compose_generation_and_isolation": 2
+  },
+  "real_loopback_high_port": {
+    "conflict_detected": true,
+    "existing_listener_still_accepts_connections": true,
+    "closed_port_passes_preflight": true,
+    "listener_cleaned": true
+  },
+  "safety_and_repeatability_fixtures": {
+    "own_edge_allowed": true,
+    "foreign_container_without_proxy_socket_blocked": true,
+    "same_project_different_state_blocked": true,
+    "first_conflict_before_download_init_pairing": true,
+    "up_conflict_before_container_mutation": true,
+    "non_start_actions_do_not_require_free_port": true
+  },
+  "not_run": [
+    "User server nginx stop/disable",
+    "Actual TCP 443 binding",
+    "Real Docker CLI formatting and container lifecycle",
+    "Linux target deployment and iPad access",
+    "Full unrelated regression"
+  ]
+}

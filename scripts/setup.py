@@ -16,6 +16,7 @@ import time
 from common import activity, download, extract, identifier, metadata, progress, read, request, require, run, sha256, write
 from local import host_platform, validate_pair
 from transfer import segmented_download
+from cloud_ports import preflight_port
 
 PACKAGE = Path(__file__).resolve().parent.parent
 SCRIPTS = PACKAGE / "scripts"
@@ -154,9 +155,11 @@ def cloud_setup(args, root):
                     and args.key.read_text() == (root / "certs/privkey.pem").read_text(), "浏览器证书与已有部署不同；换证书请使用 cloud.py renew-cert")
         if args.lock:
             require(read(args.lock)["frp_version"] == state["frp_version"], "现有 frps 版本与 lock 不同；不会隐式升级")
+        preflight_port(root, state)
     else:
         progress("[云端 2/6] 准备 frp 安装包；连接、续传与校验进度如下")
         require(not root.exists() or not any(root.iterdir()), "初始化目录非空，拒绝覆盖")
+        preflight_port(root)
         lockfile = select_lock(args, root, "linux-" + arch)
         fetch_item(read(lockfile)["files"]["frp"], args.cache, args)
         extra = ["--image", args.image] if args.image else []
@@ -210,6 +213,7 @@ def cloud_setup(args, root):
         if previous.get("applied") == digest:
             import cloud
             script("cloud.py", "--state", root, "check")
+            preflight_port(root, read(statefile))
             cloud.compose(root, "up", "-d", "--remove-orphans")
         else:
             script("cloud.py", "--state", root, "up")
