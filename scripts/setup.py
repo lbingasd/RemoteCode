@@ -188,6 +188,8 @@ def cloud_setup(args, root):
                 require(args.image == source, "镜像来源与原部署不同；升级请显式使用 cloud.py pull --image")
     if "@sha256:" not in state["image"] or not present:
         extra = ["--offline"] if args.offline else []
+        if args.cn:
+            extra += ["--cn"]
         if args.image and "@sha256:" not in state["image"]:
             extra += ["--image", args.image]
         with activity("获取并锁定 nginx 镜像；Docker 输出如下"):
@@ -527,7 +529,7 @@ def parser():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("role", choices=["cloud", "local"])
     p.add_argument("action", choices=["install", "status", "uninstall"])
-    p.add_argument("--cn", action="store_true", help="清华依赖镜像、npmmirror 和多个 GitHub Release 加速源；不改 Docker Hub")
+    p.add_argument("--cn", action="store_true", help="清华依赖镜像、npmmirror、GitHub 多源及默认 nginx 的国内仓库切换")
     p.add_argument("--skip-deps", action="store_true", help="已有依赖，不调用系统包管理器")
     p.add_argument("--offline", action="store_true", help="不装系统依赖，只用已有下载/npm/Docker缓存；扩展需本地VSIX")
     p.add_argument("--mirror", type=https, help="自己信任的 HTTPS 下载镜像，含一次 {url}")

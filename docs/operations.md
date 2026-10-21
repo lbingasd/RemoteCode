@@ -69,6 +69,8 @@ IP 变化会使浏览器证书 SAN 失配，也需要更新所有家庭主机的
 
 云端：备份 state、原始 lock、frps 和镜像 digest；`down` 后再用新下载的匹配架构 frps 替换 `bin/frps`，更新 state 中 frp 版本，并在家庭端用新 lock 安装及重新配对。此版本没有一键自动迁移状态/多机升级命令；升级前要做完整备份和维护窗口。对于 nginx 镜像，使用 `cloud.py --state state/cloud pull --image nginx:stable-alpine` 重新解析当前标签和锁定 digest，再进行 `check`、`up`；不加 `--image` 时仍检查已固定的旧 digest。
 
+使用 `pull --cn` 时，默认 nginx 的首次版本取自随包 `examples/nginx-image.lock.json`，镜像源列表和超时在 `examples/download-mirrors.json` 中维护。已有固定 digest 的缓存恢复不会改用新版 lock。需要在国内源间升级到另一明确版本时，先从可信来源核实新的官方 digest，再显式提供 `--image docker.io/library/nginx@sha256:完整哈希 --cn`；随后 `check`、`up`。显式自有仓库不自动切换公共源。
+
 AI 包第一次可在相同系统/架构的联网环境预热缓存：
 
 ```bash
@@ -93,6 +95,7 @@ python3 scripts/agents.py --root "$HOME/RemoteCode" install --npm-cache /路径/
 | Windows 重启后不可达 | IDE 是否只是登录触发；Headless 账号密码/登录权限；磁盘解锁、休眠；NSSM 服务状态 |
 | Mac 注销后不可达 | LaunchAgents 生命周期；FileVault；电源休眠策略 |
 | 国内下载中断 | `--cn` / `-CN` 启用公开工具安装包多源切换；源列表在 `examples/download-mirrors.json`，`--mirror` 自有源优先；保留缓存和官方 lock，检查日志中的源序号、域名和 HTTP 状态 |
+| nginx 拉取 Docker Hub 超时 | 更新脚本后重跑原 `install --cn`，默认 nginx 会按相同官方 digest 切换国内仓库；检查 `nginx_registries` 和超时配置。不要删除 state 或重新生成配对；`--mirror` 不控制 Docker 镜像 |
 
 云端可执行 `cloud.py status`，或 `docker compose -f state/cloud/compose.json logs --tail 100`。每个新 state 使用独立的 Compose 项目名，启停/卸载只操作自己的项目；旧 state 仍兼容原项目名。本机使用 `local.py doctor`。Windows 可用 `local-windows.ps1 -Action Status`，NSSM 日志在 `ProgramData/RemoteCode/机器名/logs`。Mac 日志在专用 root 的 `logs/`；当前 LaunchAgent 日志不自动轮转，长期运行需按系统日志管理策略轮转。Linux 使用 `journalctl --user -u remotecode-机器名-ide.service`。
 

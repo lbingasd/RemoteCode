@@ -182,3 +182,17 @@ bash -n deploy-cloud.sh deploy-local.sh scripts/bootstrap-posix.sh
 ```bash
 python3 -m unittest discover -s tests -p 'test_mirrors.py' -v
 ```
+
+## nginx 容器镜像多源与可信 digest（2026-10-21）
+
+用户云端在 Docker Hub 的 nginx manifest HEAD 请求超时；上一版只为文件下载配置镜像，容器仍直接拉取 `nginx:stable-alpine`。现由 `--cn` 为默认 nginx 依次尝试 DaoCloud、毫秒镜像、GH-Proxy 容器仓库，最后回退 Docker Hub；无需修改 `daemon.json`、全局 DNS 或重启 Docker。来源映射依据 [DaoCloud 官方项目](https://github.com/DaoCloud/public-image-mirror)、[毫秒镜像](https://1ms.run/)、[GH-Proxy 文档](https://gh-proxy.com/docs/docker-mirror)，digest 固定方式依据 [Docker 官方说明](https://docs.docker.com/reference/cli/docker/image/pull/)。
+
+从 Docker 官方 Registry 取得 nginx 多架构索引，验证响应体 SHA-256 与 `Docker-Content-Digest` 相同，记录至 `examples/nginx-image.lock.json`。三个加速源均实际返回相同索引和 Linux amd64/ARM64 平台 manifest，内容哈希全部一致，并通过标准匿名 Bearer challenge 后的 HEAD 检查。首次无 token 的 401 是正常鉴权握手，不能将其当作必须注册账号或源不可用。脚本实际拉取和鉴权交给 Docker，固定同一个 digest 后再核对本地 RepoDigest。
+
+本次 **37 项定向检查通过**：11 项新增容器镜像检查、14 项编排、10 项既有下载镜像、2 项直接相关 Compose 生成/项目隔离。覆盖失败与超时切源、同仓库且同 digest 的选择、错误内容拒绝、离线不联网、缓存缺失仍保留旧 pin、自有仓库不外送、恢复已创建 state 且保留 CA/配对、成功后更新全部容器引用。另通过 Python/Bash 语法和安装包一致性检查。[记录](evidence/container-mirrors.json)
+
+实际网络验证仅为当前 Mac 上的公开 Registry 索引/manifest GET、内容哈希及认证 HEAD；未下载全部镜像层，未运行 Docker Engine/容器、未连接用户服务器。单元测试中的 Docker 调用均为夹具，不能作为目标 Ubuntu 已完成部署的证据。目标机拉取、容器运行与 iPad 访问仍由更新后原安装命令验收。
+
+```bash
+python3 -m unittest discover -s tests -p 'test_container_images.py' -v
+```

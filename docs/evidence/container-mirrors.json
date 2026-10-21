@@ -1,0 +1,69 @@
+{
+  "date": "2026-10-21",
+  "host": "macOS x86_64",
+  "targeted_tests": {
+    "status": "PASS",
+    "count": 37,
+    "container_images": 11,
+    "orchestration": 14,
+    "file_mirrors": 10,
+    "compose_generation_and_isolation": 2
+  },
+  "official_registry": {
+    "source": "https://registry-1.docker.io/v2/library/nginx/manifests/stable-alpine",
+    "index_digest": "sha256:970364228b1e4f932abc22d321932816782cca8a20b85a77552a7cfe9acfb3b5",
+    "response_body_sha256_matches_digest_header": true,
+    "platforms": {
+      "linux-amd64": "sha256:959ae6b898852db82e5b29b929388e59914f42be0a8f4d44c89a4c1f53b49208",
+      "linux-arm64": "sha256:b42a296458c2dbdc6d75d44ccd873369aa1664ff4319c975e25fa9cfc062b30a"
+    }
+  },
+  "live_registry_probes": [
+    {
+      "host": "m.daocloud.io",
+      "repository": "docker.io/library/nginx",
+      "status": "PASS",
+      "index_digest": "sha256:970364228b1e4f932abc22d321932816782cca8a20b85a77552a7cfe9acfb3b5",
+      "platform_manifests": [
+        "amd64",
+        "arm64"
+      ],
+      "get_sha256_and_authenticated_head": "PASS for index and both platform manifests"
+    },
+    {
+      "host": "docker.1ms.run",
+      "repository": "library/nginx",
+      "status": "PASS",
+      "index_digest": "sha256:970364228b1e4f932abc22d321932816782cca8a20b85a77552a7cfe9acfb3b5",
+      "platform_manifests": [
+        "amd64",
+        "arm64"
+      ],
+      "get_sha256_and_authenticated_head": "PASS for index and both platform manifests"
+    },
+    {
+      "host": "gh-proxy.com",
+      "repository": "docker/library/nginx",
+      "status": "PASS",
+      "index_digest": "sha256:970364228b1e4f932abc22d321932816782cca8a20b85a77552a7cfe9acfb3b5",
+      "platform_manifests": [
+        "amd64",
+        "arm64"
+      ],
+      "get_sha256_and_authenticated_head": "PASS for index and both platform manifests"
+    }
+  ],
+  "checks": {
+    "preserves_existing_pin": true,
+    "preserves_state_ca_pairing_after_all_failures": true,
+    "custom_registry_not_forwarded": true,
+    "no_global_docker_or_dns_config_changes": true,
+    "offline_has_no_pull": true
+  },
+  "not_run": [
+    "Full image layer download",
+    "Docker Engine pull/RepoDigest inspection on target Linux",
+    "Container execution",
+    "User cloud server or iPad deployment"
+  ]
+}

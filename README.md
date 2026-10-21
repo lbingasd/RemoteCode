@@ -77,6 +77,8 @@ Mac/Linux 本机对应 `bash deploy-local.sh install --bundle ./mac1 --workspace
 
 `--cn` / Windows `-CN` 会为 Python、Compose、frp 的 GitHub 安装包依次尝试多个国内常用加速源，失败后切换，最后回退官方源；始终核对官方 SHA-256。源列表可在 [download-mirrors.json](examples/download-mirrors.json) 调整，`--mirror` 自定义地址优先。[镜像与缓存说明](docs/deploy.md#国内网络与镜像)。
 
+云端 `--cn` 也会为默认 nginx 依次尝试 DaoCloud、毫秒镜像和 GH-Proxy 容器仓库，最后回退 Docker Hub，按已核实的官方 digest 拉取；不修改 `daemon.json` 或重启 Docker。已有 state 重跑会接着完成镜像拉取，保留 CA 和配对资料。
+
 启动后显示带时间的依赖/部署阶段，长时间下载或等待会每 10 秒报告耗时，分段下载显示完成比例。若终端只有 `>`，请检查多行命令是否输入完整；[部署文档](docs/deploy.md)提供单行命令与 `tee` 日志用法。
 
 1. [一键部署：依赖、镜像、恢复、云端、本机、iPad](docs/deploy.md)

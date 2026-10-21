@@ -9,5 +9,11 @@
     "https://ghfast.top/{url}",
     "https://ghproxy.net/{url}",
     "https://gh-proxy.com/{url}"
-  ]
+  ],
+  "nginx_registries": [
+    "m.daocloud.io/docker.io/library/nginx",
+    "docker.1ms.run/library/nginx",
+    "gh-proxy.com/docker/library/nginx"
+  ],
+  "docker_pull_timeout_seconds": 180
 }

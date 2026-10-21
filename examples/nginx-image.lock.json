@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "image": "docker.io/library/nginx:stable-alpine",
+  "verified_at": "2026-10-21",
+  "source": "https://registry-1.docker.io/v2/library/nginx/manifests/stable-alpine",
+  "digest": "sha256:970364228b1e4f932abc22d321932816782cca8a20b85a77552a7cfe9acfb3b5",
+  "platforms": {
+    "linux-amd64": "sha256:959ae6b898852db82e5b29b929388e59914f42be0a8f4d44c89a4c1f53b49208",
+    "linux-arm64": "sha256:b42a296458c2dbdc6d75d44ccd873369aa1664ff4319c975e25fa9cfc062b30a"
+  }
+}

@@ -9,8 +9,10 @@ import secrets
 import shutil
 import ssl
 import subprocess
+import sys
 import tempfile
 from common import extract, identifier, private_dir, read, require, run, sha256, write
+from container_images import pull_image
 
 
 def compose(root, *args, **kwargs):
@@ -222,6 +224,7 @@ def main():
     pull = subs.add_parser("pull")
     pull.add_argument("--image", help="新镜像标签或自有仓库引用；解析后固定到 digest")
     pull.add_argument("--offline", action="store_true", help="只检查已 docker load 的镜像并锁定 digest")
+    pull.add_argument("--cn", action="store_true", help="默认 nginx 按官方 digest 从多个国内源拉取，失败切换")
     subs.add_parser("up")
     subs.add_parser("down")
     subs.add_parser("status")
@@ -315,16 +318,10 @@ def main():
             print(f"{machine['id']}  https://{state['ip']}/m/{machine['id']}/")
     elif args.action == "pull":
         image = args.image or state["image"]
-        require(image and not image.startswith("-"), "镜像名不合法")
-        if not args.offline:
-            run(["docker", "pull", image])
-        digests = subprocess.check_output(["docker", "image", "inspect", image,
-                                           "--format", "{{json .RepoDigests}}"], text=True)
-        import json
-        require(json.loads(digests), "镜像没有 RepoDigest，请指定可核实的仓库镜像")
-        state["image"] = json.loads(digests)[0]
-        if args.image:
-            state["image_source"] = args.image
+        source = args.image or state.get("image_source", image)
+        resolved = pull_image(image, source=source, cn=args.cn, offline=args.offline)
+        state["image"] = resolved
+        state["image_source"] = source
         write(statefile, state)
         render(root, state)
         print("镜像已固定到 digest。离线云端可在其他机器 docker save/load 同一镜像。")
@@ -369,4 +366,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (ValueError, OSError, RuntimeError, subprocess.SubprocessError) as exc:
+        print("云端操作未完成: " + str(exc), file=sys.stderr)
+        sys.exit(1)

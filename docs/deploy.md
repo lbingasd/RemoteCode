@@ -62,7 +62,11 @@ sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc1 \
 
 独立调用底层下载器时，可用 `REMOTECODE_CN=1 python3 scripts/download.py fetch ...` 启用同一列表；一键入口会自动传递此设置，覆盖私有 Python/Compose 引导及后续下载。加速源按实际线路可能失败，脚本不会关闭 TLS 或跳过哈希校验。
 
-`--cn` **不配置 Docker Hub 加速**。Python / Compose / frp / VS Code / Node / NSSM 也可指定自有 HTTPS 下载镜像；nginx 可使用自有仓库：
+云端 `--cn` 也为默认 `nginx:stable-alpine` 配置容器镜像源切换，顺序为 DaoCloud `m.daocloud.io/docker.io/library/nginx` → 毫秒镜像 `docker.1ms.run/library/nginx` → GH-Proxy `gh-proxy.com/docker/library/nginx` → Docker Hub。路径和每源拉取超时在 `download-mirrors.json` 的 `nginx_registries`、`docker_pull_timeout_seconds`（默认 180 秒）中设置。镜像按同一个官方 digest 拉取，禁止因源切换改成其他版本；索引固定于 `examples/nginx-image.lock.json`，覆盖 Linux x64/ARM64。现有已固定版本在镜像缓存丢失时仍使用旧 digest。
+
+脚本只为本项目选择镜像引用，不修改 Docker 全局 `daemon.json`、DNS 或重启 Docker。已有未完成的 state 可直接重跑原命令，复用 frps、CA 和设备凭据；拉取全部失败时不改 state/Compose/配对资料。拉取成功后记录实际仓库的 digest 引用，后续重跑已有本地镜像时不再次联网。`--offline` 只校验当前引用的本地 RepoDigest，不下载或切源。底层维护命令也可使用 `./.bootstrap/python/bin/python3 scripts/cloud.py --state /opt/remotecode-state pull --cn`。
+
+显式 `--image` 自有仓库仅拉取指定引用，不自动转发至公共加速仓库；`--mirror` 只控制文件下载。Python / Compose / frp / VS Code / Node / NSSM 可指定自有 HTTPS 下载镜像，nginx 可指定自有容器仓库：
 
 ```bash
 sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc1 --cn \
