@@ -527,7 +527,7 @@ def parser():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("role", choices=["cloud", "local"])
     p.add_argument("action", choices=["install", "status", "uninstall"])
-    p.add_argument("--cn", action="store_true", help="显式选择清华依赖镜像及 npmmirror；不提供随机 GitHub/Docker Hub 代理")
+    p.add_argument("--cn", action="store_true", help="清华依赖镜像、npmmirror 和多个 GitHub Release 加速源；不改 Docker Hub")
     p.add_argument("--skip-deps", action="store_true", help="已有依赖，不调用系统包管理器")
     p.add_argument("--offline", action="store_true", help="不装系统依赖，只用已有下载/npm/Docker缓存；扩展需本地VSIX")
     p.add_argument("--mirror", type=https, help="自己信任的 HTTPS 下载镜像，含一次 {url}")
@@ -561,6 +561,8 @@ def parser():
 def main():
     require(sys.version_info >= (3, 12), "需要 Python 3.12+")
     args = parser().parse_args()
+    if args.cn:
+        os.environ["REMOTECODE_CN"] = "1"
     require(not args.purge or args.action == "uninstall", "--purge 仅用于 uninstall")
     if args.mirror:
         require(args.mirror.count("{url}") == 1, "镜像模板须包含一次 {url}")

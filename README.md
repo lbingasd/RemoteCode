@@ -75,6 +75,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy-local.ps1 -Action I
 
 Mac/Linux 本机对应 `bash deploy-local.sh install --bundle ./mac1 --workspace "$HOME/Projects" --accept-license --cn`，先在云端注册 mac1。重跑保留版本和密钥，下载中断自动续传。AI 登录、iPad 公共 CA 导入仍需本人完成。
 
+`--cn` / Windows `-CN` 会为 Python、Compose、frp 的 GitHub 安装包依次尝试多个国内常用加速源，失败后切换，最后回退官方源；始终核对官方 SHA-256。源列表可在 [download-mirrors.json](examples/download-mirrors.json) 调整，`--mirror` 自定义地址优先。[镜像与缓存说明](docs/deploy.md#国内网络与镜像)。
+
 启动后显示带时间的依赖/部署阶段，长时间下载或等待会每 10 秒报告耗时，分段下载显示完成比例。若终端只有 `>`，请检查多行命令是否输入完整；[部署文档](docs/deploy.md)提供单行命令与 `tee` 日志用法。
 
 1. [一键部署：依赖、镜像、恢复、云端、本机、iPad](docs/deploy.md)

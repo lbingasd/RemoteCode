@@ -48,7 +48,21 @@ sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc1 \
 
 ### 国内网络与镜像
 
-`--cn` **不包含公共 GitHub 加速代理或 Docker Hub 镜像**。Python / Compose / frp / VS Code / Node / NSSM 可指定自己信任的 HTTPS 下载镜像；nginx 可使用自有仓库：
+`--cn` / Windows `-CN` 现在对 Python、Compose、frp 的公开 GitHub Release 安装包启用多个国内常用加速源，顺序为：
+
+1. `--mirror` 指定的自定义源（如有）。
+2. `https://ghfast.top/{url}`。
+3. `https://ghproxy.net/{url}`。
+4. `https://gh-proxy.com/{url}`。
+5. GitHub 官方地址。
+
+连接/传输失败、HTTP 错误、不支持合法 Range 或最终哈希不匹配时，依次尝试后续源；日志显示当前源序号和域名。404/403 等确定性错误和普通下载的哈希错误不重复等待三次。分段下载可复用有效分段，普通下载为每个源保留独立的可续传前缀，重跑无需删除缓存。全部失败后保留可恢复缓存并退出。
+
+编辑 [`examples/download-mirrors.json`](../examples/download-mirrors.json) 的 `github_release` 数组即可增删或调整优先级；`github_repositories` 限定自动转发的公开工具仓库。只使用 HTTPS；预期 SHA-256 始终来自已核实的官方 lock，不从加速源重新获取可信哈希。GitHub API、带查询参数/凭据的原始 URL、其他仓库和微软地址不自动转发；可显式提供自有 `--mirror`。不加 `--cn` 时，仍使用显式自有源及官方源。
+
+独立调用底层下载器时，可用 `REMOTECODE_CN=1 python3 scripts/download.py fetch ...` 启用同一列表；一键入口会自动传递此设置，覆盖私有 Python/Compose 引导及后续下载。加速源按实际线路可能失败，脚本不会关闭 TLS 或跳过哈希校验。
+
+`--cn` **不配置 Docker Hub 加速**。Python / Compose / frp / VS Code / Node / NSSM 也可指定自有 HTTPS 下载镜像；nginx 可使用自有仓库：
 
 ```bash
 sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc1 --cn \
@@ -87,7 +101,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy-local.ps1 -Action I
 5. 仅为注册 NSSM 服务和 IDE 计划任务弹出 UAC；IDE、npm、AI 不以管理员或 LocalSystem 运行。
 6. 等待启动并检查本机 IDE 和云端 TLS，输出普通访问 URL。此检查不等于 iPad/实际跨网链路验收。
 
-`-CN` 使 npm 使用 `https://registry.npmmirror.com`。WinGet 的 Python/Node/Git 仍使用其官方 manifest 和来源，不替换成随机安装器镜像；有网络限制时先通过可信渠道安装依赖，再加 `-SkipDeps`。自有下载镜像用 `-Mirror 'https://你的镜像/{url}'`，自选 npm 源用 `-Registry https://你的源`。
+`-CN` 使 npm 使用 `https://registry.npmmirror.com`，公开工具的 GitHub Release 下载使用上述多源列表。WinGet 的 Python/Node/Git 仍使用其官方 manifest 和来源；有网络限制时先通过可信渠道安装依赖，再加 `-SkipDeps`。自有下载镜像用 `-Mirror 'https://你的镜像/{url}'`，自选 npm 源用 `-Registry https://你的源`。
 
 依赖引导主要面向 Windows 10/11；没有受支持 WinGet/App Installer 的 Windows Server 环境，请先安装 Python/Node/Git，再用 `-SkipDeps`。云端 Windows Server 仍需要 Linux VM，与家庭 Windows 原生运行方式不同。
 

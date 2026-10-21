@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "github_repositories": [
+    "docker/compose",
+    "astral-sh/python-build-standalone",
+    "fatedier/frp"
+  ],
+  "github_release": [
+    "https://ghfast.top/{url}",
+    "https://ghproxy.net/{url}",
+    "https://gh-proxy.com/{url}"
+  ]
+}

@@ -92,7 +92,7 @@ python3 scripts/agents.py --root "$HOME/RemoteCode" install --npm-cache /路径/
 | ACP 视图空白或长时间加载 | 当前微软 Web IDE 的 webview 还会请求 `*.vscode-cdn.net`；完整安装包不代表所有浏览器资源离线可用。检查 iPad 到该 CDN 的访问、Web Worker/Service Worker，以及浏览器控制台。 |
 | Windows 重启后不可达 | IDE 是否只是登录触发；Headless 账号密码/登录权限；磁盘解锁、休眠；NSSM 服务状态 |
 | Mac 注销后不可达 | LaunchAgents 生命周期；FileVault；电源休眠策略 |
-| 国内下载中断 | 优先使用受信任镜像/预下载；检查 Python CA 或改用系统 curl；保留官方 lock 的哈希 |
+| 国内下载中断 | `--cn` / `-CN` 启用公开工具安装包多源切换；源列表在 `examples/download-mirrors.json`，`--mirror` 自有源优先；保留缓存和官方 lock，检查日志中的源序号、域名和 HTTP 状态 |
 
 云端可执行 `cloud.py status`，或 `docker compose -f state/cloud/compose.json logs --tail 100`。每个新 state 使用独立的 Compose 项目名，启停/卸载只操作自己的项目；旧 state 仍兼容原项目名。本机使用 `local.py doctor`。Windows 可用 `local-windows.ps1 -Action Status`，NSSM 日志在 `ProgramData/RemoteCode/机器名/logs`。Mac 日志在专用 root 的 `logs/`；当前 LaunchAgent 日志不自动轮转，长期运行需按系统日志管理策略轮转。Linux 使用 `journalctl --user -u remotecode-机器名-ide.service`。
 

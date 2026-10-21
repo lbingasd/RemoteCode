@@ -168,3 +168,17 @@ bash -n scripts/bootstrap-posix.sh
 python3 -m unittest discover -s tests -p 'test_compose_bootstrap.py' -v
 bash -n deploy-cloud.sh deploy-local.sh scripts/bootstrap-posix.sh
 ```
+
+## 多个国内常用下载源与失败切换（2026-10-21）
+
+针对云端 GitHub 安装包下载失败，`--cn` / Windows `-CN` 现对指定公开工具的 Release 安装包启用三个 HTTPS 加速源：[`ghfast.top`](https://ghfast.top/)、[`ghproxy.net`](https://ghproxy.net/)、[`gh-proxy.com`](https://gh-proxy.com/)，显式 `--mirror` 优先，官方源兜底。列表和工具仓库范围在 `examples/download-mirrors.json`。三个服务的实际可达性依赖目标机线路；这里仅把它们用于已有官方 SHA-256 的公开安装包字节，不将其作为可信版本或哈希来源。
+
+普通及分段下载共用源顺序，日志显示源序号、域名和错误码；403/404 等确定性错误直接切换，校验失败清除不可信数据后继续。普通下载为不同源分别保留前缀，分段下载仍以完整官方哈希最终确认所有分段。GitHub API、未列入配置的仓库、带查询参数/凭据的 URL 不自动送往这些源。
+
+本次 **54 项定向检查通过**：10 项新多源检查、7 项 Compose 引导、2 项入口、7 项 Python 引导、10 项传输、4 项进度、14 项编排。覆盖源优先级与去重、官方回退、404/403 与 Range 不支持切换、哈希错误后恢复、跨完整失败周期保留各源前缀、日志脱敏，以及 CN 设置传到 shell 引导及 Python 子进程。另通过 Python 3.8 引导语法检查、Bash 语法检查、PowerShell 解析和 5 项 Windows 参数引号检查。未重跑无关的完整原生 IDE/frp 链路，未连接用户服务器或执行 Linux Docker。
+
+三个源对公开 Compose 安装包的 `bytes=0-0` 探测均成功。随后使用空临时缓存实际下载 Linux x64 Compose：先以不可连接的本地自定义源验证首源失败，再在 `ghfast.top` 传输遇到 HTTP 502 后自动切到 `ghproxy.net`，复用 12 个有效分段，最终完成 32,676,477 字节并通过官方 SHA-256。当前 Mac 线路共耗时约 303 秒，不代表用户服务器的速度或可达性；第三个源仅完成 Range 探测，未完整下载。没有执行 Linux 程序。[记录](evidence/mirror-failover.json)
+
+```bash
+python3 -m unittest discover -s tests -p 'test_mirrors.py' -v
+```

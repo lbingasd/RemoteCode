@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-21",
+  "host": "macOS x86_64",
+  "targeted_tests": {
+    "status": "PASS",
+    "count": 54,
+    "mirrors": 10,
+    "compose_bootstrap": 7,
+    "shell_entrypoints": 2,
+    "python_bootstrap": 7,
+    "transfers": 10,
+    "progress": 4,
+    "orchestration": 14
+  },
+  "python38_bootstrap_syntax": "PASS",
+  "bash_syntax": "PASS",
+  "powershell_parse_and_five_argument_cases": "PASS on Mac, not native Windows",
+  "range_probes": {
+    "ghfast.top": "PASS: one-byte range",
+    "ghproxy.net": "PASS: one-byte range",
+    "gh-proxy.com": "PASS: one-byte range, no complete download"
+  },
+  "live_download": {
+    "status": "PASS",
+    "name": "docker-compose-linux-x86_64",
+    "bytes": 32676477,
+    "sha256": "47737f4236e6d3ccea7291995203f8f018058783b4c3a9469119811a0b5db8c0",
+    "official_hash_lock": "examples/compose-plugin.lock.json",
+    "elapsed_seconds": 303,
+    "initial_cache": "empty",
+    "first_custom_source": "127.0.0.1:9, intentionally unreachable",
+    "first_accelerator": "ghfast.top, partial success then HTTP 502",
+    "next_accelerator": "ghproxy.net, completed download",
+    "reused_segments_from_previous_source": 12,
+    "total_segments": 32,
+    "executed": false
+  },
+  "not_run": [
+    "User cloud server connectivity or deployment",
+    "Linux Docker container execution",
+    "Native Windows installation",
+    "Full unrelated native IDE/frp regression"
+  ]
+}

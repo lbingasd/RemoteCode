@@ -20,6 +20,8 @@ import urllib.request
 import urllib.error
 import zipfile
 
+MIRRORS_FILE = Path(__file__).resolve().parent.parent / "examples/download-mirrors.json"
+
 
 class HTTPResult:
     def __init__(self, stream, status, headers, ranged=False):
@@ -153,6 +155,46 @@ def metadata(url):
         return json.load(response)
 
 
+def download_sources(url, mirror=None):
+    """Only public, hash-locked release bytes use automatic third-party mirrors."""
+    templates = [mirror] if mirror else []
+    parsed = urllib.parse.urlsplit(url)
+    public_release = (parsed.scheme == "https" and parsed.hostname == "github.com"
+                      and not parsed.username and not parsed.password and parsed.port in (None, 443)
+                      and not parsed.query and not parsed.fragment
+                      and re.fullmatch(r"/[^/]+/[^/]+/releases/download/[^/]+/[^/]+", parsed.path))
+    if os.environ.get("REMOTECODE_CN") == "1" and public_release:
+        config = read(MIRRORS_FILE)
+        require(config.get("schema") == 1 and isinstance(config.get("github_release"), list)
+                and isinstance(config.get("github_repositories"), list), "下载镜像配置格式不正确")
+        repository = "/".join(parsed.path.split("/")[1:3]).lower()
+        if repository in config["github_repositories"]:
+            templates.extend(config["github_release"])
+    candidates = []
+    for template in templates:
+        require(isinstance(template, str) and template.count("{url}") == 1, "镜像模板必须包含一次 {url}")
+        candidate = template.replace("{url}", url)
+        require(urllib.parse.urlsplit(candidate).scheme == "https", "下载镜像必须使用 HTTPS")
+        if candidate not in candidates:
+            candidates.append(candidate)
+    if url not in candidates:
+        candidates.append(url)
+    return candidates
+
+
+def download_partials(dest, source, original):
+    # Separate prefixes let each mirror resume after a complete failed source cycle.
+    suffix = "" if source == original else ".source-" + hashlib.sha256(source.encode()).hexdigest()[:16]
+    partial = dest.with_name(dest.name + suffix + ".part")
+    return partial, partial.with_name(partial.name + ".json")
+
+
+def download_error(exc):
+    """Useful status without exposing URL queries, credentials or exception bodies."""
+    code = getattr(exc, "code", None) or getattr(exc, "errno", None)
+    return type(exc).__name__ + ("(" + str(code) + ")" if isinstance(code, int) else "")
+
+
 def download(url, dest, expected, mirror=None):
     with activity("下载/检查缓存 " + Path(dest).name):
         return _download(url, dest, expected, mirror)
@@ -166,13 +208,18 @@ def _download(url, dest, expected, mirror=None):
         progress("缓存校验通过，复用 " + dest.name)
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
-    candidates = [url]
-    if mirror:
-        require(mirror.count("{url}") == 1, "镜像模板必须包含一次 {url}")
-        candidates.insert(0, mirror.replace("{url}", url))
-    temp = dest.with_name(dest.name + ".part")
-    resume = dest.with_name(dest.name + ".part.json")
-    for source in candidates:
+    candidates = download_sources(url, mirror)
+
+    def publish(temp):
+        temp.replace(dest)
+        for source in candidates:
+            for partial in download_partials(dest, source, url):
+                partial.unlink(missing_ok=True)
+        return dest
+
+    for index, source in enumerate(candidates, 1):
+        progress(f"尝试下载源 {index}/{len(candidates)}: {urllib.parse.urlsplit(source).hostname}")
+        temp, resume = download_partials(dest, source, url)
         identity = {"url": source, "sha256": expected.lower()}
         try:
             reusable = resume.is_file() and read(resume) == identity
@@ -184,9 +231,7 @@ def _download(url, dest, expected, mirror=None):
         for attempt in range(3):
             try:
                 if temp.is_file() and sha256(temp) == expected.lower():
-                    temp.replace(dest)
-                    resume.unlink(missing_ok=True)
-                    return dest
+                    return publish(temp)
                 offset = temp.stat().st_size if temp.exists() else 0
                 headers = {"Accept-Encoding": "identity"}
                 if offset:
@@ -213,20 +258,20 @@ def _download(url, dest, expected, mirror=None):
                     if length is not None and received != int(length):
                         raise OSError("下载传输被截断，已保留可续传片段")
                 require(sha256(temp) == expected.lower(), "下载 SHA-256 不匹配")
-                temp.replace(dest)
-                resume.unlink(missing_ok=True)
-                return dest
+                return publish(temp)
             except Exception as exc:
                 # Invalid data/ranges are discarded. Transport failures preserve a prefix
                 # across process restarts; its final full-file hash is never bypassed.
                 if isinstance(exc, ValueError) or getattr(exc, "code", None) == 416:
                     temp.unlink(missing_ok=True)
-                if attempt == 2:
-                    progress(f"下载源失败: {urllib.parse.urlsplit(source).hostname}: {type(exc).__name__}")
+                fatal = isinstance(exc, ValueError) or getattr(exc, "code", None) in (400, 401, 403, 404, 410)
+                if attempt == 2 or fatal:
+                    progress(f"下载源失败: {urllib.parse.urlsplit(source).hostname}: {download_error(exc)}；尝试后续源（如有）")
+                    break
                 else:
                     time.sleep(1 + attempt)
-    if not temp.exists():
-        resume.unlink(missing_ok=True)
+        if not temp.exists():
+            resume.unlink(missing_ok=True)
     raise RuntimeError("所有下载源失败；可重运行续传、使用 --segmented，或安全复制完整缓存")
 
 

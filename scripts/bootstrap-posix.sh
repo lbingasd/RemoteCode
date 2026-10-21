@@ -120,6 +120,8 @@ rc_bootstrap() {
             --ip=*) address=${arg#--ip=} ;;
         esac
     done
+    # Also covers Python/Compose downloads before setup.py starts.
+    export REMOTECODE_CN="$RC_CN"
     [ -z "$previous" ] || rc_die "$previous requires a value."
     system=$(uname -s)
     if [ "$help" -eq 1 ]; then

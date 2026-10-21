@@ -5,7 +5,8 @@ import re
 import shutil
 import threading
 import time
-from common import activity, progress, read, request, require, sha256, write
+import urllib.parse
+from common import activity, download_error, download_sources, progress, read, request, require, sha256, write
 
 
 def content_range(response, start, end, total=None):
@@ -35,12 +36,10 @@ def _segmented_download(url, dest, expected, mirror=None, workers=8, chunk_size=
     dest.parent.mkdir(parents=True, exist_ok=True)
     parts = dest.with_name(dest.name + ".chunks")
     parts.mkdir(exist_ok=True)
-    sources = [url]
-    if mirror:
-        require(mirror.count("{url}") == 1, "镜像模板必须包含一次 {url}")
-        sources.insert(0, mirror.replace("{url}", url))
+    sources = download_sources(url, mirror)
     errors = []
-    for source in sources:
+    for index, source in enumerate(sources, 1):
+        progress(f"尝试分段源 {index}/{len(sources)}: {urllib.parse.urlsplit(source).hostname}")
         try:
             with request(source, {"Range": "bytes=0-0", "Accept-Encoding": "identity"}) as probe:
                 total = content_range(probe, 0, 0)
@@ -95,7 +94,9 @@ def _segmented_download(url, dest, expected, mirror=None, workers=8, chunk_size=
                                 if len(data) != requested_length:
                                     raise OSError("子分段传输截断，保留已核对范围的前缀")
                             failures = 0
-                        except OSError:
+                        except OSError as exc:
+                            if getattr(exc, "code", None) in (400, 401, 403, 404, 410):
+                                raise
                             if position > before:
                                 failures = 0
                                 span = max(65536, span // 2)
@@ -140,6 +141,6 @@ def _segmented_download(url, dest, expected, mirror=None, workers=8, chunk_size=
             shutil.rmtree(parts)
             return dest
         except Exception as exc:
-            errors.append(f"{type(exc).__name__}: {exc}")
-            print(f"分段源失败，已完成的分段保留: {type(exc).__name__}", flush=True)
+            errors.append(download_error(exc))
+            progress(f"分段源失败: {urllib.parse.urlsplit(source).hostname}: {download_error(exc)}；尝试后续源（如有），有效缓存可重用")
     raise RuntimeError("分段下载失败；再次运行可恢复。" + "; ".join(errors))
