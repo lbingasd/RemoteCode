@@ -155,3 +155,16 @@ bash -n scripts/bootstrap-posix.sh
 本次 **38 项定向检查通过**：4 项新进度检查、10 项传输检查、14 项部署编排检查、1 项下载完整性检查、2 项入口检查、7 项旧 Python 引导检查。另通过 PowerShell 解析及 5 个 Windows 参数引号用例；使用 Python 3.11 实际演示等待心跳和已校验 Linux Python 缓存复用。未重跑无关的完整原生链路、未连接用户云端或执行 Ubuntu/Docker 部署。[记录](evidence/progress-checks.json)
 
 新增等待日志不打印完整命令行、下载 URL 中的鉴权内容或异常中的潜在秘密；异常路径会停止心跳并显示“未完成”，不会显示成功。源有完整性校验失败时仍拒绝安装，不因增加进度展示改变校验/续传规则。
+
+## 已有 Docker 缺少 Compose 的补装修复（2026-10-21）
+
+旧入口遇到已有 Docker 缺少 Compose 时直接退出。现在按 [Docker 官方独立插件安装方式](https://docs.docker.com/compose/install/linux/)补装到 `/usr/local/lib/docker/cli-plugins`，仅在 `docker compose version` 不可用时执行，不替换现有 Docker 软件包。使用 [Compose 5.6.1 官方发布](https://github.com/docker/compose/releases/tag/v5.6.1)中 x64/ARM64 的独立 digest 锁定下载；先完整校验、暂存并验证插件元数据，再发布可执行文件。已存在的未知文件或符号链接不会被覆盖，共享插件卸载时保留，升级需单独维护。
+
+本次 **30 项定向检查通过**：7 项新增 Compose 引导检查、2 项入口检查、7 项 Python 引导检查、10 项传输检查、4 项进度检查。覆盖已有 Docker 补装及重跑不调用 apt、镜像/缓存参数转发、篡改/元数据错误拒绝、失败不发布、保留未知插件/链接，以及 Range 失败回退。
+
+实际下载 Linux x64 插件 32,676,477 字节，SHA-256 与官方发布 digest 一致，检查 ELF64/x86-64 文件头；ARM64 完成官方 digest 元数据核对。使用已有且重新核对官方 digest 的 Mac 同版本程序，在临时目录实际验证暂存安装、插件元数据、重复执行复用与清理。**未执行 Linux 二进制、apt、Docker 守护进程或连接用户服务器**，目标 Ubuntu 的插件发现、引擎版本兼容及容器运行仍需重跑部署验收。[记录](evidence/compose-bootstrap.json)
+
+```bash
+python3 -m unittest discover -s tests -p 'test_compose_bootstrap.py' -v
+bash -n deploy-cloud.sh deploy-local.sh scripts/bootstrap-posix.sh
+```

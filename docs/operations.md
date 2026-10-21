@@ -63,6 +63,8 @@ IP 变化会使浏览器证书 SAN 失配，也需要更新所有家庭主机的
 
 不自动滚动升级。使用新的 download lock 记录精确版本和 SHA-256；已有 lock 文件默认拒绝覆盖。frpc/frps 按相同版本成对更新。
 
+为已有 Docker 补装的独立 Compose 插件属于共享依赖，卸载 RemoteCode 时保留。它不会自动更新；后续升级应按 [Docker 官方插件维护说明](https://docs.docker.com/compose/install/linux/)单独安排，并验证 `docker compose version` 和项目 `check`。不要直接覆盖系统中来源不明的插件或删除仍被其他项目使用的插件。
+
 本机 IDE/agent：备份现有安装目录、npm `package-lock.json` 和需要的运行数据；停止旧运行项；使用新的专用安装目录和新 lock 安装，再注册运行项。先验证终端、ACP、认证和断线恢复。失败时停止新运行项，恢复旧目录和旧运行项，不改动项目代码。不要把 Windows、Mac 或不同架构的 `node_modules` 互相复制。
 
 云端：备份 state、原始 lock、frps 和镜像 digest；`down` 后再用新下载的匹配架构 frps 替换 `bin/frps`，更新 state 中 frp 版本，并在家庭端用新 lock 安装及重新配对。此版本没有一键自动迁移状态/多机升级命令；升级前要做完整备份和维护窗口。对于 nginx 镜像，使用 `cloud.py --state state/cloud pull --image nginx:stable-alpine` 重新解析当前标签和锁定 digest，再进行 `check`、`up`；不加 `--image` 时仍检查已固定的旧 digest。

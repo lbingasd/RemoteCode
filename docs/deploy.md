@@ -12,6 +12,8 @@ sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc1 --cn
 
 `--cn` 表示选择清华的 apt / Docker CE 软件仓库镜像；不加时使用系统现有 apt 源和 Docker 官方仓库。系统 apt 源不被改写；安装 Docker 时会保留其软件仓库配置供以后维护，不修改 `daemon.json`。执行过程中断后，重跑同一命令即可。
 
+已有 Docker 但缺少 Compose 时，自动补装官方独立 CLI 插件到 `/usr/local/lib/docker/cli-plugins/docker-compose`，不替换 Docker、containerd 或现有容器。插件固定为 Compose 5.6.1（兼容这里使用的 Compose v2 命令接口），x64/ARM64 的官方 SHA-256 记录在 `examples/compose-plugin.lock.json`；支持下载续传、`--cache` 和 `--mirror`。已有可用 Compose 直接复用；已有不可用的同路径文件或符号链接不会被覆盖，需先检查其来源。自有 `DOCKER_CONFIG/cli-plugins` 中的坏插件可能遮挡系统插件，可用 `docker --help` 查看 Invalid Plugins 并处理对应文件。
+
 ### 进度、日志与命令输入
 
 如果终端停在单独的 `>` 提示符，通常是在等待多行命令输入完成，脚本还没有启动；可按 `Ctrl+C` 取消这条未完成的输入。`>` 提示符不要手工复制进命令；手工输入的 `>` 是输出重定向操作符。为避免复制续行符，推荐直接运行下面这一整行（替换示例 IP）：
@@ -46,7 +48,7 @@ sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc1 \
 
 ### 国内网络与镜像
 
-`--cn` **不包含公共 GitHub 加速代理或 Docker Hub 镜像**。frp / VS Code / Node / NSSM 可指定自己信任的 HTTPS 下载镜像；nginx 可使用自有仓库：
+`--cn` **不包含公共 GitHub 加速代理或 Docker Hub 镜像**。Python / Compose / frp / VS Code / Node / NSSM 可指定自己信任的 HTTPS 下载镜像；nginx 可使用自有仓库：
 
 ```bash
 sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc1 --cn \

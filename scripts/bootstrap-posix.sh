@@ -57,7 +57,15 @@ rc_apt() {
 rc_docker() {
     rc_log '[依赖 3/3] 检查 Docker Engine 和 Compose'
     if command -v docker >/dev/null 2>&1; then
-        docker compose version >/dev/null 2>&1 || rc_die 'Existing Docker has no Compose plugin. Install its matching plugin; existing Docker packages will not be replaced.'
+        if ! docker compose version >/dev/null 2>&1; then
+            rc_log '已有 Docker 缺少可用 Compose，安装独立插件，保留现有 Docker 软件包'
+            local compose_args=(--cache "$RC_DOWNLOAD_CACHE/bootstrap")
+            [ -z "$RC_DOWNLOAD_MIRROR" ] || compose_args+=(--mirror "$RC_DOWNLOAD_MIRROR")
+            rc_as_root "$RC_PYTHON" -u "$RC_PACKAGE/scripts/bootstrap-compose.py" "${compose_args[@]}"
+            docker compose version || rc_die 'Compose plugin is installed but not discoverable. Check Docker CLI version and higher-priority plugins in DOCKER_CONFIG/cli-plugins.'
+        else
+            rc_log '已有 Docker Compose 可用，直接复用'
+        fi
     else
         rc_log '准备 Docker 软件源与安装包；下方显示 apt/curl 原始进度'
         # Do not remove a competing container runtime on the user's behalf.

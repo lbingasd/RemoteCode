@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-21",
+  "host": "macOS x86_64",
+  "targeted_tests": {
+    "status": "PASS",
+    "count": 30,
+    "compose_bootstrap": 7,
+    "shell_entrypoints": 2,
+    "python_bootstrap": 7,
+    "transfers": 10,
+    "progress": 4
+  },
+  "shell_syntax": "PASS",
+  "official_release": "https://github.com/docker/compose/releases/tag/v5.6.1",
+  "linux_x64_download": {
+    "status": "PASS",
+    "bytes": 32676477,
+    "sha256": "47737f4236e6d3ccea7291995203f8f018058783b4c3a9469119811a0b5db8c0",
+    "header": "ELF64 little-endian x86-64",
+    "executed": false
+  },
+  "linux_arm64_official_digest": "42cfa75f51ad0ccf290bad37899e0038a8c10a0069e85233ecc1d53e3ff1347d",
+  "mac_native_temporary_install": {
+    "official_digest_verified": true,
+    "metadata_probe": "PASS",
+    "staged_publication": "PASS",
+    "repeated_install_preserves_inode": true,
+    "temporary_install_cleaned": true,
+    "global_plugin_installed": false
+  },
+  "not_run": [
+    "Linux plugin execution and Docker CLI discovery",
+    "apt package installation",
+    "Docker Engine and container lifecycle",
+    "user cloud server deployment"
+  ]
+}

@@ -45,7 +45,7 @@ frpc 直接连接公网 IP，并用 `pc1.tunnel.invalid` 这样的内部 SNI 标
 | 家庭 Windows 10/11、Windows Server 2019+ | 原生 VS Code Web Server + frpc；AI 使用原生 Node.js/CLI | NSSM 运行 frpc；普通开发用户运行 IDE。具体 CLI/系统版本仍以厂商要求为准。 |
 | 家庭 macOS Intel/Apple Silicon | 同样使用原生 Web Server + frpc | 用户 LaunchAgents；重启后需要登录，FileVault 解锁不能靠此隧道完成。 |
 | 家庭 Linux x64/ARM64 | 原生 Web Server + frpc | systemd 用户服务；无人登录启动需另开 linger。 |
-| 云端 Linux x64/ARM64（推荐） | Docker Engine + Compose v2 的 Linux 容器 | 开机启动 Docker；容器自动重启。 |
+| 云端 Linux x64/ARM64（推荐） | Docker Engine + Compose v2+ 的 Linux 容器 | 开机启动 Docker；容器自动重启。 |
 | 云端 macOS / Windows 10、11 | Docker Desktop 的 Linux 容器 | 适合测试/个人使用；Docker Desktop 通常需要用户登录后启动。 |
 | 云端 Windows Server | Linux VM 内运行上述云端方案 | 不把 Docker Desktop 或 Windows 容器当作 Windows Server 上的等价实现。虚拟机需正确转发 TCP 443。 |
 
