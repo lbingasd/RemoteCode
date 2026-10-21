@@ -1,0 +1,63 @@
+{
+  "original_sha256": "43730cccef6d7fb38daabae0a7a0b99c37bfa4ceb1cfe421e2ecd96e1b8fde27",
+  "patched_sha256": "8776247a56153c7ffe05908a562874943c1bd690ea5a40c451a6b22be61d7e7b",
+  "revision": 1,
+  "date": "2026-10-22",
+  "issue": "Safari 18.5 lacks CSS anchor positioning; initialized ACP WebView appeared at y=727 below a 727px viewport, with default 300x150 frame and 0x0 overlay root.",
+  "user_device_before": {
+    "css_anchor_top": false,
+    "css_anchor_size": false,
+    "css_position_anchor": false,
+    "webview_handshake": "PASS",
+    "acp_ready": "PASS",
+    "chat_visible": false
+  },
+  "user_device_after": {
+    "source": "Direct user confirmation in this conversation",
+    "welcome_and_input_visible": true
+  },
+  "automated_checks": {
+    "webview_compat": 6,
+    "setup": 16,
+    "deployment": 8,
+    "total": 30,
+    "result": "PASS"
+  },
+  "browser_fixture": {
+    "engine": "Mac in-app Chromium browser",
+    "unsupported_anchor_branch_forced": true,
+    "real_acp_chat_html": true,
+    "inert_api_stub": true,
+    "checks": [
+      "native class preserved",
+      "initial bounds",
+      "move and resize",
+      "scroll",
+      "clip path",
+      "hide to zero size",
+      "show",
+      "scale 0.8",
+      "dispose"
+    ],
+    "result": "PASS",
+    "bounds_max_error_pixels": "less than 1",
+    "screenshot": "webview-layout-fallback.png"
+  },
+  "actual_mac_ide": {
+    "native_branch_chat_visible": true,
+    "diagnostic_overlay_removed": true
+  },
+  "cloud_read_only": {
+    "tls_certificate_validated": true,
+    "authenticated_ide_http": 200,
+    "patched_bundle_http": 200,
+    "patched_bundle_sha256_matches": true,
+    "cloud_service_mutations": false
+  },
+  "scope_limits": [
+    "No model requests or authenticated AI responses tested",
+    "No real Windows/Linux execution",
+    "No iPad keyboard, orientation or long-session recovery acceptance in this change"
+  ],
+  "real_model_requests": 0
+}

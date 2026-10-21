@@ -81,6 +81,26 @@ python3 scripts/agents.py --root "$HOME/RemoteCode" install --npm-cache /路径/
 
 某些包的安装脚本可能单独下载原生资源；仅复制 npm cache 不保证这些下载也可离线。若离线安装失败，先在相同平台预装验证，不通过关闭包完整性或 TLS 校验绕过。
 
+## WebView 布局兼容补丁
+
+固定的 VS Code Web 1.143.0 使用 CSS `anchor()` / `anchor-size()` 放置 WebView；实测 Safari 18.5 不支持这些属性，可能出现 agent 已连接、聊天脚本已 ready，面板却位于视口下方的情况。安装器包含一个有版本校验的兼容补丁，支持原生 CSS 锚点时继续使用原实现，否则以元素坐标、ResizeObserver 和滚动/布局变化更新位置、尺寸及裁剪。
+
+已有部署只需更新工具包，在**家庭电脑**的工具包目录执行以下命令；Windows 可将 `python3` 换成已安装的 Python 3.12+ 解释器，将 root 改成自己的安装目录：
+
+```bash
+python3 scripts/webview_compat.py apply --root "$HOME/RemoteCode"
+```
+
+关闭旧浏览器标签页，重新打开 IDE。补丁更新 workbench 模块 URL 的缓存版本；无需重启服务，不改变 CA、账号、权限或 AI 凭据。全局下载缓存中的官方安装归档不修改。当前补丁只接受已核实的 workbench 完整 SHA-256；升级 VS Code 或其他平台遇到哈希不匹配时会拒绝应用，需要先核实对应文件，不能删除校验强行安装。
+
+原始备份位于 `<root>/server/out/vs/code/browser/workbench/`，文件名为 `workbench.js.remotecode-original` 与 `workbench.html.remotecode-original`。单独回退：
+
+```bash
+python3 scripts/webview_compat.py restore --root "$HOME/RemoteCode"
+```
+
+回退前也校验当前文件，检测到后续其他修改会拒绝覆盖；备份继续保留。随后关闭旧标签页重新打开。再次运行本机 `install` 会重新应用兼容补丁；普通卸载保留整个运行目录，`--purge` 随专用运行目录一并删除补丁及备份。
+
 ## 排障
 
 | 现象 | 优先检查 |
@@ -91,7 +111,7 @@ python3 scripts/agents.py --root "$HOME/RemoteCode" install --npm-cache /路径/
 | 502 | 家庭电脑是否在线；frpc 认证/重连；IDE 是否监听 127.0.0.1；nginx 对应 loopback 转发端口是否存在 |
 | frpc TLS 错误 | 配对 CA、`serverName` 内部标签、云端隧道证书和 IP；不要关闭验证 |
 | 网页开了但终端/ACP 不工作 | 检查 WebSocket、扩展版本、适配器依赖、GUI PATH 与绝对路径、CLI 登录、模型服务网络 |
-| ACP 视图空白或长时间加载 | 当前微软 Web IDE 的 webview 还会请求 `*.vscode-cdn.net`；完整安装包不代表所有浏览器资源离线可用。检查 iPad 到该 CDN 的访问、Web Worker/Service Worker，以及浏览器控制台。 |
+| ACP 视图空白或长时间加载 | Safari 18.5 已启动却空白时，先更新工具包并在家庭电脑应用上述布局兼容补丁；其他启动失败仍需检查 `*.vscode-cdn.net`、安全上下文和 Service Worker。完整安装包不代表浏览器资源全部离线可用。 |
 | Windows 重启后不可达 | IDE 是否只是登录触发；Headless 账号密码/登录权限；磁盘解锁、休眠；NSSM 服务状态 |
 | Mac 注销后不可达 | LaunchAgents 生命周期；FileVault；电源休眠策略 |
 | 国内下载中断 | `--cn` / `-CN` 启用公开工具安装包多源切换；源列表在 `examples/download-mirrors.json`，`--mirror` 自有源优先；保留缓存和官方 lock，检查日志中的源序号、域名和 HTTP 状态 |

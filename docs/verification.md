@@ -1,6 +1,6 @@
 # 来源与验证记录
 
-核对日期：2026-10-21（Asia/Shanghai）。本文件区分方案依据、脚本检查和真实部署证据。
+核对日期：2026-10-22（Asia/Shanghai）。本文件区分方案依据、脚本检查和真实部署证据。
 
 ## 上游依据
 
@@ -218,3 +218,27 @@ python3 -m unittest discover -s tests -p 'test_cloud_ports.py' -v
 已修正设置目标路径，重跑时导入旧路径设置，保留旧文件、已有自定义 agent 和实际设置中的用户值，首次迁移保存备份。本机正式运行目录已完成迁移，网页远程设置编辑器可见两个本机配置。用户随后在 iPad 刷新并确认：**已出现两个本机 agent，可以连接**。此前截图右侧的 Copilot Chat 登录提示属于另一个聊天入口，ACP 应使用自己的 Chat 面板。
 
 本次 16 项安装器定向测试通过，新增旧路径迁移、用户设置优先与备份保留检查，并修正现有集成检查使用的设置路径。未发送真实模型请求；用户确认连接成功不能替代实际模型对话、编辑和长任务恢复验收。[记录](evidence/acp-settings-path.json)
+
+## Safari 18.5 ACP 聊天空白修复（2026-10-22）
+
+用户真机日志确认，安全上下文、Web Crypto、微软 WebView 握手和 ACP `ready` 均通过；独立完整 ACP 页面也能显示欢迎文字和输入框。实际 IDE 中 CSS `anchor()`、`anchor-size()`、`position-anchor` 三项检测均为 false，WebView 为默认 `300×150`，其父容器位于视口下方 `y=727`，外层布局容器为 `0×0`。结合已安装 VS Code 1.143.0 的布局代码，定位到旧 Safari 缺少 CSS 锚点支持，不能将此问题归因于 agent 认证或跨域启动失败。
+
+新增 `webview_compat.py` 对已核实的 workbench 原始文件校验完整 SHA-256，再为布局类增加回退：支持 CSS 锚点时返回原实现；不支持时跟随锚点元素、裁剪容器、滚动、尺寸和布局变化更新像素坐标。保留逻辑焦点关系，dispose 时释放观察器和事件监听。脚本保留原始 JS/HTML 备份，拒绝覆盖未知版本或后续其他修改，支持重复应用和单独恢复；模块 URL 加缓存版本以避免复用旧脚本。已接入新安装与已有安装的重跑，未更改官方下载归档。
+
+本次 **30 项定向自动检查通过**：6 项新增补丁校验/重复执行/恢复/中断继续/其他修改保留检查、16 项安装器、8 项直接相关部署检查。实际官方 workbench 修改后通过 Node 语法检查。浏览器夹具强制走不支持锚点的分支，加载实际 ACP HTML 与无网络副作用的 API stub，欢迎内容和输入框可见，初始布局、移动/缩放、滚动裁剪、隐藏/恢复、0.8 倍缩放及 dispose 均通过，坐标误差小于 1 像素；这部分是 Mac Chromium 上的回退分支检查，不冒充 Safari 真机测试。[记录](evidence/webview-layout-fallback.json)、[截图](evidence/webview-layout-fallback.png)
+
+用完整已校验 Mac 安装包和随包 VSIX 在唯一临时目录完成真实一键安装、重复执行、修复文件/备份/缓存版本检查、IDE token/cookie HTTP 200、变更配对拒绝、purge 与重复卸载，项目保留，无测试服务残留；未安装共享系统依赖或请求模型。[安装检查](evidence/webview-install-macos.json)
+
+修复已应用到当前正式 Mac，原临时 workbench 诊断覆盖层已恢复。经既有云端 HTTPS/frp 入口只读取回页面与完整 workbench，HTTP 200、CA 校验和修复文件哈希均通过；未通过工具修改云服务。Mac 正式 IDE 的原生布局分支聊天界面正常。**用户在 iPad 关闭旧页、重新打开正式入口后明确确认：欢迎界面和输入框均出现。** 此真机确认覆盖聊天显示，不代表真实模型响应、编辑权限、软键盘、横竖屏或长任务恢复已完成验收。历史 session 被另一个 Codex 客户端占用是单独问题，未强行终止其他客户端。
+
+```bash
+python3 -m unittest discover -s tests -p 'test_webview_compat.py'
+python3 -m unittest discover -s tests -p 'test_setup.py'
+python3 -m unittest discover -s tests -p 'test_deployment.py'
+# 当前 Mac，仅已有缓存和随包 VSIX；不注册服务、不请求模型。
+python3 tests/integration_setup.py --cache downloads \
+  --vsix assets/formulahendry.acp-client-0.2.0.vsix --accept-license \
+  --report /临时报告路径.json
+# 独立回退分支浏览器夹具，生成后仅通过 loopback HTTP 提供。
+python3 tests/webview_layout_fixture.py --output /临时夹具目录
+```

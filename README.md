@@ -96,8 +96,9 @@ Mac/Linux 本机对应 `bash deploy-local.sh install --bundle ./mac1 --workspace
 | [local-windows.ps1](scripts/local-windows.ps1) | Windows NSSM 服务和开发用户计划任务 |
 | [local-service.py](scripts/local-service.py) | macOS LaunchAgents / Linux systemd 用户服务 |
 | [agents.py](scripts/agents.py) | 本机 CLI/ACP 依赖安装、版本锁、启动与设置生成 |
+| [webview_compat.py](scripts/webview_compat.py) | Safari 无 CSS 锚点时的 WebView 布局回退，校验版本并支持恢复原文件 |
 
-已在当前 Mac 实测完整安装包下载、真实 nginx/frp/双 IDE 链路、浏览器终端与 ACP 视图、CLI 和 ACP 初始化、LaunchAgents 生命周期及清理。未连接或修改你的云服务器、家庭 Windows PC 或 iPad。**Docker 容器运行、Windows 服务、iPad 真机与真实模型任务仍需在目标环境验收，详见验证记录。**
+已在当前 Mac 实测完整安装包下载、真实 nginx/frp/双 IDE 链路、浏览器终端与 ACP 视图、CLI 和 ACP 初始化、LaunchAgents 生命周期及清理。正式 Mac 已部署；用户已在 iPad 确认两个本机 agent 可连接。随后根据 Safari 18.5 真机日志定位并应用 WebView 布局兼容补丁，浏览器回退分支已验证；用户已在 iPad 重新打开后确认欢迎界面和输入框均出现。已只读验证现有云入口返回修复文件，未通过工具修改云服务。**Windows 服务、Docker 目标机生命周期与真实模型任务仍需分别验收，详见验证记录。**
 
 新增一键入口也已在 Mac 实测缓存安装、npm 中断阶段恢复、重复执行、JSONC 设置合并、LaunchAgents 注册与重复卸载；NSSM/ACP 小依赖随包提供并校验。系统依赖管理器的实际安装（apt/Homebrew/WinGet）未在本次执行，以免改动当前共享环境。打包可复现：`python3 scripts/build-package.py`，输出 ZIP 与同名 `.sha256`，不包含运行密钥或大型下载缓存。
 

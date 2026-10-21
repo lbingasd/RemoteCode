@@ -16,6 +16,7 @@ import tempfile
 import urllib.request
 import zipfile
 from common import extract, identifier, private_dir, read, require, run, sha256, write
+from webview_compat import apply_server
 
 
 def host_platform():
@@ -117,6 +118,7 @@ def install_runtime(root, bundle, lock, cache, workspace, pair):
         require(node.is_file(), "Web Server 包中缺少匹配平台的 Node")
         node.chmod(0o755)
         run([node, "--version"], stdout=subprocess.DEVNULL)
+        apply_server(stage / "server")
         write(stage / "ca.pem", (bundle / "ca.pem").read_text())
         write(stage / "ide-token", pair["ide_token"] + "\n")
         write(stage / "frpc.toml", frpc_config(stage, pair))
@@ -130,7 +132,7 @@ def install_runtime(root, bundle, lock, cache, workspace, pair):
         write(stage / "local.json", config)
         write(stage / "download.lock.json", lock)
         write_windows_task(root, config, target=stage)
-        for filename in ("local.py", "common.py"):
+        for filename in ("local.py", "common.py", "webview_compat.py"):
             shutil.copy2(Path(__file__).parent / filename, stage / filename)
         # Recheck immediately before replacing an empty target; never merge with user data.
         if root.exists():

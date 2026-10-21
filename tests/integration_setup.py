@@ -27,6 +27,7 @@ import cloud
 from common import read, require, run, write
 from local import server_args
 from agents import npm_command
+from webview_compat import BUNDLE, TEMPLATE, MARKER, QUERY
 
 PACKAGE = Path(__file__).resolve().parents[1]
 
@@ -74,10 +75,18 @@ def main():
         try:
             run(command)
             report["checks"].append("fresh offline runtime and real VSIX install via deploy-local.sh")
+            workbench = root / "server" / BUNDLE
+            patched = workbench.read_bytes()
+            require(MARKER.encode() in patched and workbench.with_suffix('.js.remotecode-original').is_file(),
+                    "WebView 兼容布局或备份缺失")
+            require(QUERY.encode() in (root / "server" / TEMPLATE).read_bytes(), "WebView 缓存版本缺失")
+            require((root / "webview_compat.py").is_file(), "运行目录缺少兼容模块")
+            report["checks"].append("actual vendor bundle patched with original backup, cache revision and copied runtime module")
             before = (root / "ide-token").read_bytes()
             inode = (root / "server/node").stat().st_ino
             run(command)
             require((root / "ide-token").read_bytes() == before and (root / "server/node").stat().st_ino == inode, "重跑覆盖安装/密钥")
+            require(workbench.read_bytes() == patched, "重跑重复修改 WebView")
             report["checks"].append("rerun retains credentials, program files and installed extension")
             if args.npm_cache:
                 # Simulate an interrupted install after package-lock creation.

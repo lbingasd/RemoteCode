@@ -17,6 +17,7 @@ from common import activity, download, extract, identifier, metadata, progress, 
 from local import host_platform, validate_pair
 from transfer import segmented_download
 from cloud_ports import preflight_port
+from webview_compat import apply_server
 
 PACKAGE = Path(__file__).resolve().parent.parent
 SCRIPTS = PACKAGE / "scripts"
@@ -491,6 +492,7 @@ def home_setup(args, root):
         require(tomllib.loads((root / "frpc.toml").read_text())["auth"]["token"] == pair["frp_token"], "frp token 已变更；请重新配对")
         select_lock(args, root, platform_name, local=True)
         print("家庭运行目录已安装；保留版本、密钥、IDE 数据和项目。")
+        apply_server(root / "server")
     else:
         require(not root.exists() or not any(root.iterdir()), "运行目录非空，拒绝覆盖")
         lockfile = select_lock(args, root, platform_name, local=True)
