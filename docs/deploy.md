@@ -150,7 +150,7 @@ macOS 使用当前用户 LaunchAgents，需登录；Linux 使用 systemd 用户�
 - 已安装运行目录保留版本、密钥、项目和 IDE 数据；配对包/工作区不同会拒绝覆盖，换密钥请按运维文档操作。
 - 已完成的 npm 安装、扩展和服务会检查后复用；npm 使用缓存与重试，系统依赖下载由 apt/Homebrew/WinGet 自身管理，不能承诺它们都具备分段级续传。
 - 云端相同配置重跑不强制重建现有容器；新增机器、证书/配置/密钥变化会重建并造成短暂重连。不会在重跑时更新已锁定的镜像。
-- 远程设置支持 JSON/JSONC；保留原设置和自定义 ACP 项，首次合并备份为 `data/Machine/settings.json.remotecode-backup`。JSONC 会格式化为 JSON，原注释留在备份；非法设置拒绝覆盖。
+- 远程设置支持 JSON/JSONC；实际路径为运行目录内的 `data/data/Machine/settings.json`（VS Code 在 `--server-data-dir` 下再创建一层 `data`）。保留原设置和自定义 ACP 项，首次合并备份为同目录的 `settings.json.remotecode-backup`。重跑会导入旧版误写到 `data/Machine/settings.json` 的设置，实际路径中的用户设置优先，旧文件保留。JSONC 会格式化为 JSON，原注释留在备份；非法设置拒绝覆盖。
 - `--skip-deps` / `-SkipDeps`：不调用系统包管理器，其余步骤照常。
 - `--offline` / `-Offline`：不安装系统依赖，不请求下载源或 registry；需提前准备全部缓存、已有 npm lock 与完整 npm 缓存、云端 Docker RepoDigest。包自己的安装脚本可能额外联网，真正隔离环境需阻断网络并验证，不承诺任意包脚本绝不联网。
 
@@ -193,7 +193,11 @@ python3 scripts/local.py --root "$HOME/RemoteCode" url --show-secrets
 
 将 `root-ca.crt` 公共证书传给 iPad，安装描述文件，再到“设置 → 通用 → 关于本机 → 证书信任设置”开启完全信任。使用首次 token 链接访问、输入 Basic Auth 后，收藏不含 token 的 `https://IP/m/pc1/`。如果初始化时用 `--cert/--key` 提供浏览器信任的公网 IP 证书，可省略浏览器的私人 CA 信任步骤。
 
-在 IDE 的 ACP 列表选择 **Codex (local ACP)** 或 **Claude (local ACP)**。终端执行 `hostname` 确认是家庭电脑，再验证编辑、ACP 权限确认、蜂窝网络和断线重连。WebView 仍可能请求 `*.vscode-cdn.net`；本机 CLI 默认访问在线模型，不等于本地推理。
+在左侧 **ACP Client → Agents** 中找到 **Codex (local ACP)** 或 **Claude (local ACP)**，点对应行右侧的插头连接；只展开 agent 行不会建立连接。命令面板也可执行 **ACP: Connect to Agent**。随后执行 **ACP: Open Chat Panel**，在 ACP 自己的 Chat 面板发送任务；右侧 VS Code 内置 Copilot Chat 是另一个入口，这条链路无需登录 Copilot。不要选择扩展自带的旧版默认 `Codex CLI` 配置。
+
+若只有默认 agent 列表、没有两个带 `(local ACP)` 的条目，先更新工具包并重跑本机原安装命令，再刷新网页；修复版会迁移到 VS Code 实际读取的远程设置路径。若命令面板没有 ACP 命令，检查当前工作区是否处于 Restricted Mode，确认项目来源后由本人决定是否信任。
+
+终端执行 `hostname` 确认是家庭电脑，再验证编辑、ACP 权限确认、蜂窝网络和断线重连。WebView 仍可能请求 `*.vscode-cdn.net`；本机 CLI 默认访问在线模型，不等于本地推理。
 
 ## 查看状态、新增机器与卸载
 

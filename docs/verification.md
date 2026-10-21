@@ -210,3 +210,11 @@ python3 -m unittest discover -s tests -p 'test_container_images.py' -v
 ```bash
 python3 -m unittest discover -s tests -p 'test_cloud_ports.py' -v
 ```
+
+## ACP 远程设置路径修复（2026-10-21）
+
+首次正式部署的配置文件和 ACP 初始化握手通过，但用户 iPad 的网页仍显示扩展默认 agent 列表。实际打开网页中的 **Preferences: Open Remote Settings (JSON)**，确认此版本 VS Code Server 在 `--server-data-dir <root>/data` 下使用 `<root>/data/data/Machine/settings.json`；旧安装器少写了一层 `data`。这表明磁盘文件检查和 adapter 握手不能代替网页配置生效验证。
+
+已修正设置目标路径，重跑时导入旧路径设置，保留旧文件、已有自定义 agent 和实际设置中的用户值，首次迁移保存备份。本机正式运行目录已完成迁移，网页远程设置编辑器可见两个本机配置。用户随后在 iPad 刷新并确认：**已出现两个本机 agent，可以连接**。此前截图右侧的 Copilot Chat 登录提示属于另一个聊天入口，ACP 应使用自己的 Chat 面板。
+
+本次 16 项安装器定向测试通过，新增旧路径迁移、用户设置优先与备份保留检查，并修正现有集成检查使用的设置路径。未发送真实模型请求；用户确认连接成功不能替代实际模型对话、编辑和长任务恢复验收。[记录](evidence/acp-settings-path.json)

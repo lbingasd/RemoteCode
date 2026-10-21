@@ -93,7 +93,7 @@ class SetupTests(unittest.TestCase):
     def test_settings_merge_preserves_custom_agents_and_policy(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            path = root / "data/Machine/settings.json"
+            path = root / "data/data/Machine/settings.json"
             original = {"editor.fontSize": 19, "acp.agents": {"custom": {"command": "/custom"}}, "acp.autoApprovePermissions": "ask"}
             common.write(path, original)
             common.write(root / "acp-settings.json", {"acp.agents": {"Codex (local ACP)": {"command": "/local"}}, "acp.autoApprovePermissions": "ask", "acp.logTraffic": False})
@@ -107,12 +107,42 @@ class SetupTests(unittest.TestCase):
     def test_invalid_settings_are_not_overwritten(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            path = root / "data/Machine/settings.json"
+            path = root / "data/data/Machine/settings.json"
             common.write(path, '// existing comments\n{"editor.fontSize": bad,}\n')
             before = path.read_bytes()
             with self.assertRaises(ValueError):
                 setup.merge_settings(root)
             self.assertEqual(path.read_bytes(), before)
+
+    def test_legacy_settings_migrate_to_actual_server_settings_without_overwriting_user_values(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            legacy = root / "data/Machine/settings.json"
+            target = root / "data/data/Machine/settings.json"
+            common.write(legacy, {"editor.fontSize": 19, "acp.agents": {"old": {"command": "/old"}}})
+            before = legacy.read_bytes()
+            common.write(target, {"editor.fontSize": 22, "acp.agents": {"custom": {"command": "/custom"}}, "acp.autoApprovePermissions": "ask"})
+            common.write(root / "acp-settings.json", {"acp.agents": {"Codex (local ACP)": {"command": "/local"}}, "acp.logTraffic": False})
+            setup.merge_settings(root)
+            setup.merge_settings(root)
+            merged = common.read(target)
+            self.assertEqual(merged["editor.fontSize"], 22)
+            self.assertEqual(set(merged["acp.agents"]), {"old", "custom", "Codex (local ACP)"})
+            self.assertEqual(merged["acp.autoApprovePermissions"], "ask")
+            self.assertEqual(legacy.read_bytes(), before)
+            self.assertEqual(common.read(target.with_suffix(".json.remotecode-backup"))["editor.fontSize"], 22)
+
+    def test_legacy_only_settings_are_imported_and_backed_up(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            legacy = root / "data/Machine/settings.json"
+            original = {"editor.fontSize": 19, "acp.agents": {"custom": {"command": "/custom"}}}
+            common.write(legacy, original)
+            common.write(root / "acp-settings.json", {"acp.agents": {"Codex (local ACP)": {"command": "/local"}}})
+            setup.merge_settings(root)
+            target = root / "data/data/Machine/settings.json"
+            self.assertEqual(common.read(target.with_suffix(".json.remotecode-backup")), original)
+            self.assertEqual(set(common.read(target)["acp.agents"]), {"custom", "Codex (local ACP)"})
 
     def test_jsonc_preserves_string_comments_and_accepts_trailing_comma(self):
         text = r'''// header

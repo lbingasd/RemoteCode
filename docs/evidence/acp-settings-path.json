@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-21",
+  "scope": "ACP configuration discovery and migration in the installed macOS runtime",
+  "server_data_dir": "<runtime>/data",
+  "previous_settings_path": "<runtime>/data/Machine/settings.json",
+  "actual_settings_path": "<runtime>/data/data/Machine/settings.json",
+  "checks": {
+    "installer_targeted_unit_tests": 16,
+    "legacy_configuration_preserved": true,
+    "actual_configuration_user_values_take_precedence": true,
+    "first_merge_backup_preserved": true,
+    "browser_remote_settings_editor_confirmed_actual_path": true,
+    "installed_runtime_migrated": true,
+    "browser_remote_settings_editor_contains_local_agents": true,
+    "ipad_local_agent_names_and_connection": "confirmed by the user after refreshing"
+  },
+  "real_model_requests": 0,
+  "not_verified": [
+    "authenticated model conversation",
+    "agent file edits",
+    "long-running task recovery"
+  ]
+}

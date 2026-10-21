@@ -90,7 +90,7 @@ def main():
                 marker = read(root / "setup.json")
                 require(marker.get("agents"), "代理安装标记缺失")
                 module_inode = (root / "agents/node_modules/@openai/codex/package.json").stat().st_ino
-                settings = root / "data/Machine/settings.json"
+                settings = root / "data/data/Machine/settings.json"
                 settings.write_text('// retain my settings\n' + settings.read_text().rstrip()[:-1] + ', "editor.fontSize":19,}\n')
                 run(command)
                 require((root / "agents/node_modules/@openai/codex/package.json").stat().st_ino == module_inode, "重跑仍然执行了 npm ci")

@@ -286,20 +286,36 @@ def agent_identity(root):
 
 
 def merge_settings(root):
-    target = root / "data/Machine/settings.json"
-    try:
-        current = parse_jsonc(target.read_text(encoding="utf-8-sig")) if target.exists() else {}
-    except (ValueError, OSError) as exc:
-        raise ValueError(f"现有远程设置不能解析，已保留；修复 {target} 后重跑，或手动合并 acp-settings.json 并加 --no-agents") from exc
-    require(isinstance(current, dict), "远程 settings.json 必须是对象")
+    # --server-data-dir is the server root. VS Code adds its own data/ directory
+    # for userDataPath, and the remote settings resource lives below that path.
+    target = root / "data/data/Machine/settings.json"
+    legacy = root / "data/Machine/settings.json"
+    current = {}
+    for source in (legacy, target):
+        if not source.exists():
+            continue
+        try:
+            incoming = parse_jsonc(source.read_text(encoding="utf-8-sig"))
+        except (ValueError, OSError) as exc:
+            raise ValueError(f"现有远程设置不能解析，已保留；修复 {source} 后重跑，或手动合并 acp-settings.json 并加 --no-agents") from exc
+        require(isinstance(incoming, dict), "远程 settings.json 必须是对象")
+        agents = incoming.get("acp.agents", {})
+        require(isinstance(agents, dict), "现有 acp.agents 必须是对象")
+        combined_agents = {**current.get("acp.agents", {}), **agents}
+        current.update(incoming)
+        if combined_agents:
+            current["acp.agents"] = combined_agents
     generated = read(root / "acp-settings.json")
     existing = current.get("acp.agents", {})
     require(isinstance(existing, dict), "现有 acp.agents 必须是对象")
     current["acp.agents"] = {**existing, **generated.pop("acp.agents")}
     for key, value in generated.items():
         current.setdefault(key, value)
-    if target.exists() and not target.with_suffix(".json.remotecode-backup").exists():
-        shutil.copy2(target, target.with_suffix(".json.remotecode-backup"))
+    backup = target.with_suffix(".json.remotecode-backup")
+    source = target if target.exists() else legacy
+    if source.exists() and not backup.exists():
+        backup.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, backup)
     write(target, current)
 
 
