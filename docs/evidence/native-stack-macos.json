@@ -1,0 +1,14 @@
+{
+  "checks": [
+    "nginx syntax and TLS files",
+    "real IDE through nginx HTTPS + WSS/frp",
+    "anonymous and cross-machine Basic Auth rejected",
+    "per-device frp token and two IDE cookie paths",
+    "untrusted TLS CA rejected",
+    "real IDE WebSocket upgrade through full proxy chain",
+    "installed runtime doctor with cookie-aware redirect",
+    "access log omits connection secrets"
+  ],
+  "scope": "native macOS loopback; no Docker, iPad or model calls",
+  "status": "PASS"
+}

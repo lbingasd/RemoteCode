@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-21",
+  "platform": "macOS 15.7.3 x86_64",
+  "python": "3.12.8",
+  "automated_tests": {
+    "passed": 34,
+    "failed": 0
+  },
+  "native_nginx": "1.30.6",
+  "frp": "0.71.1",
+  "vscode_web": "1.143.0",
+  "vscode_web_bytes": 230220150,
+  "vscode_web_sha256": "0256c257c6386a3e5cfbbe2a7529d80830ead35ceba6cf00d47bd2cfef57b18c",
+  "compose": {
+    "version": "5.6.1",
+    "offline_config": "PASS",
+    "daemon_available": false
+  },
+  "powershell": {
+    "version": "7.6.7",
+    "parser_and_argument_forwarding": "PASS",
+    "windows_native_services_tested": false
+  },
+  "real_model_requests": 0,
+  "ipad_tested": false,
+  "oneclick": {
+    "macos_real_cached_install": "PASS",
+    "npm_lock_resume_and_rerun": "PASS",
+    "final_bundled_vsix_and_launchagents": "PASS",
+    "powershell_parser": "PASS (PowerShell 7 on Mac)",
+    "windows_crt_argument_cases": 5,
+    "nssm_archive_sha256": "99f5045fffbffb745d67fe3a065a953c4a3d9c253b868892d9b685b0ee7d07b8",
+    "system_dependency_managers_executed": false,
+    "windows_native_execution": false,
+    "linux_docker_execution": false,
+    "reports": [
+      "oneclick-macos.json",
+      "oneclick-bundled-macos.json"
+    ]
+  }
+}

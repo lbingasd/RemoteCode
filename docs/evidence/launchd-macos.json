@@ -1,0 +1,11 @@
+{
+  "status": "PASS",
+  "actions": [
+    "install",
+    "status",
+    "stop",
+    "start",
+    "remove"
+  ],
+  "persistent_items_remaining": 0
+}

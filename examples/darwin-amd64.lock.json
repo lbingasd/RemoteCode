@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "platform": "darwin-amd64",
+  "frp_version": "0.71.1",
+  "vscode_version": "1.143.0",
+  "server_commit": "2d0b7506a36c1d6db9a466440131a8e01eab2289",
+  "files": {
+    "frp": {
+      "name": "frp_0.71.1_darwin_amd64.tar.gz",
+      "url": "https://github.com/fatedier/frp/releases/download/v0.71.1/frp_0.71.1_darwin_amd64.tar.gz",
+      "sha256": "8acb59b6fb998cc8d209d1373d90bf70fa5ec3efeb4dfbc7bda6ce3abd78cb45"
+    },
+    "vscode_web": {
+      "name": "vscode-web-1.143.0-darwin-amd64.zip",
+      "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/2d0b7506a36c1d6db9a466440131a8e01eab2289/vscode-server-darwin-x64-web.zip",
+      "sha256": "0256c257c6386a3e5cfbbe2a7529d80830ead35ceba6cf00d47bd2cfef57b18c"
+    }
+  }
+}

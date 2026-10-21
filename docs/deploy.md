@@ -1,0 +1,164 @@
+# 一键部署
+
+先云端，再家庭电脑，最后在 iPad 导入公共证书并登录。所有命令在解压后的工具包根目录执行；`203.0.113.10` 是示例，必须替换成真实公网 IPv4。
+
+## 云服务器：一条安装命令
+
+推荐 Ubuntu 24.04+ / Debian 13+，x64 或 ARM64。脚本自动检查并通过 apt 安装 Python 3.12+、curl、CA、OpenSSL、Docker Engine 和 Compose 插件，启用 Docker 开机启动。已有可用 Docker 保留，不自动替换冲突的容器运行时。
+
+```bash
+sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc1 --cn
+```
+
+`--cn` 表示选择清华的 apt / Docker CE 软件仓库镜像；不加时使用系统现有 apt 源和 Docker 官方仓库。系统 apt 源不被改写；安装 Docker 时会保留其软件仓库配置供以后维护，不修改 `daemon.json`。执行过程中断后，重跑同一命令即可。
+
+脚本会下载并校验 frp，生成个人 CA 和 IP 证书，注册机器，拉取并锁定 nginx 镜像 digest，检查配置后启动。默认 state 为工具包内的 `state/cloud`；建议长期部署时明确指定稳定的绝对路径：
+
+```bash
+sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc1 \
+  --state /opt/remotecode-state --cn
+```
+
+已有 Python 3.12+ 的较旧 Ubuntu/Debian 可继续使用；其他 Linux 发行版请先安装依赖，再加 `--skip-deps`。无 Python 3.12+ 的旧发行版不会被自动添加第三方 Python PPA。云端 Windows Server / macOS 请使用 Linux VM 执行此入口；本脚本不自动创建虚拟机，也不把 Windows 容器当作替代品。
+
+### 国内网络与镜像
+
+`--cn` **不包含公共 GitHub 加速代理或 Docker Hub 镜像**。frp / VS Code / Node / NSSM 可指定自己信任的 HTTPS 下载镜像；nginx 可使用自有仓库：
+
+```bash
+sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc1 --cn \
+  --mirror 'https://你的下载镜像/{url}' \
+  --image '你的镜像仓库/nginx:固定标签'
+```
+
+这是参数格式示意，镜像地址必须替换。`--mirror` 必须含一次 `{url}`；镜像只提供字节，预期 SHA-256 仍来自官方 lock。国内镜像无法保证任何网络都可达，也不解决模型服务的网络与账号问题。
+
+### 安装完成后取出两份资料
+
+| 位置（相对 state） | 用途 |
+|---|---|
+| `enrollment/pc1/` | 完整目录安全复制到家庭 pc1，含该机器的配对密钥和初始密码 |
+| `pki/root-ca.crt` | 公共根证书，安全传给 iPad |
+| `pki/root-ca.key` | CA 私钥，仅云端保存/安全备份，不能发给家庭电脑或 iPad |
+
+安全组最终仅公开所需的 TCP 443。脚本不更改已有安全组、防火墙、SSH/RDP 配置；处理管理端口前先确认厂商控制台可恢复，也检查 IPv6 策略。frps 和家庭 IDE 端口不能公开。
+
+## 家庭 Windows：一条安装命令
+
+将工具包解压到例如 `C:\RemoteCode-Deploy`，将服务器导出的 `pc1` 目录放在其中。在**普通开发账号**的 PowerShell 中执行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy-local.ps1 -Action Install -Bundle .\pc1 -Workspace "$env:USERPROFILE\Projects" -AcceptLicense -CN
+```
+
+只在这个子进程中放行脚本，不永久修改系统执行策略。`-AcceptLicense` 表示已阅读并接受[微软个人 VS Code Server 许可](https://code.visualstudio.com/license/server)。
+
+脚本自动完成：
+
+1. 检查 Python 3.12+、Node.js 22+、Git；缺失时通过微软 WinGet 安装。缺少 WinGet 时尝试微软官方 `Microsoft.WinGet.Client` 修复流程；系统策略不允许时会明确退出，保留已完成步骤。
+2. 下载并校验完整 VS Code Web Server 与 frpc；创建工作区；安装到默认 `%USERPROFILE%\RemoteCode`。
+3. 在专用目录安装 Codex、Claude 和两个 ACP 适配器，锁定 npm 版本；安装锁定的 ACP 扩展，合并远程 IDE 设置。
+4. 优先使用随包 NSSM，按微软 WinGet manifest 中的 ZIP SHA-256 校验，再提取对应 exe；缺少随包资源时自动下载。
+5. 仅为注册 NSSM 服务和 IDE 计划任务弹出 UAC；IDE、npm、AI 不以管理员或 LocalSystem 运行。
+6. 等待启动并检查本机 IDE 和云端 TLS，输出普通访问 URL。此检查不等于 iPad/实际跨网链路验收。
+
+`-CN` 使 npm 使用 `https://registry.npmmirror.com`。WinGet 的 Python/Node/Git 仍使用其官方 manifest 和来源，不替换成随机安装器镜像；有网络限制时先通过可信渠道安装依赖，再加 `-SkipDeps`。自有下载镜像用 `-Mirror 'https://你的镜像/{url}'`，自选 npm 源用 `-Registry https://你的源`。
+
+依赖引导主要面向 Windows 10/11；没有受支持 WinGet/App Installer 的 Windows Server 环境，请先安装 Python/Node/Git，再用 `-SkipDeps`。云端 Windows Server 仍需要 Linux VM，与家庭 Windows 原生运行方式不同。
+
+默认 IDE 在用户登录后启动，frpc 服务随系统启动。需要无人登录启动 IDE 时增加 `-Headless`，交互输入**同一开发账号的密码，不是 Windows Hello PIN**；任务计划程序保存凭据。重跑同一配置保留已有凭据，不再索要密码。把已存在的登录任务改成 Headless，须先移除运行项后重新安装，详见运维文档。磁盘解锁、休眠和系统策略仍会影响远程可达性。
+
+可自带 NSSM：`-NssmPath C:\Tools\nssm.exe -NssmSha256 '<可信的64位SHA256>'`。自动 NSSM 仅支持 Windows x64；其他架构提供经过核实的兼容二进制，或用 `-NoService` 后手动管理进程。
+
+## 家庭 macOS / Linux：一条安装命令
+
+在云端先用 `--machine mac1` 注册，复制对应 `enrollment/mac1/` 到本机工具包目录。**不要 sudo 运行本机入口**：
+
+```bash
+bash deploy-local.sh install --bundle ./mac1 --workspace "$HOME/Projects" \
+  --accept-license --cn
+```
+
+默认运行目录 `$HOME/RemoteCode`。macOS 通过 Homebrew 补齐 Python / Node / Git；缺少 Homebrew 时使用其官方安装脚本。`--cn` 临时传入清华 Homebrew API、bottles 和 Git 仓库镜像配置。若缺少 Apple Command Line Tools，脚本会唤起安装并退出，完成系统安装界面后重跑同一命令。必要的 sudo/系统交互不能由脚本静默绕过。
+
+Linux 的依赖自动安装范围同云端 Ubuntu/Debian。系统 Node 低于 22 时，在 RemoteCode 专用运行目录安装 Node 22 LTS，不替换其他项目的系统 Node。后续 `agents.py` 能定位此私有 Node。
+
+macOS 使用当前用户 LaunchAgents，需登录；Linux 使用 systemd 用户服务，无人登录启动时管理员可按需执行 `loginctl enable-linger 用户名`。脚本不自动改变休眠、FileVault/BitLocker 或账号安全策略。
+
+## 重复执行、续传和离线
+
+**中断后原样重跑安装命令。** 核心程序默认分段续传，保留完整分段和有效子段，合并后必须通过完整 SHA-256；不支持 Range 的下载源自动回退到普通校验续传，也可显式加 `--simple-download` / `-SimpleDownload`。不要在两个进程中共用同一下载缓存进行下载；同一运行目录的一键操作有系统锁保护。
+
+- 已安装运行目录保留版本、密钥、项目和 IDE 数据；配对包/工作区不同会拒绝覆盖，换密钥请按运维文档操作。
+- 已完成的 npm 安装、扩展和服务会检查后复用；npm 使用缓存与重试，系统依赖下载由 apt/Homebrew/WinGet 自身管理，不能承诺它们都具备分段级续传。
+- 云端相同配置重跑不强制重建现有容器；新增机器、证书/配置/密钥变化会重建并造成短暂重连。不会在重跑时更新已锁定的镜像。
+- 远程设置支持 JSON/JSONC；保留原设置和自定义 ACP 项，首次合并备份为 `data/Machine/settings.json.remotecode-backup`。JSONC 会格式化为 JSON，原注释留在备份；非法设置拒绝覆盖。
+- `--skip-deps` / `-SkipDeps`：不调用系统包管理器，其余步骤照常。
+- `--offline` / `-Offline`：不安装系统依赖，不请求下载源或 registry；需提前准备全部缓存、已有 npm lock 与完整 npm 缓存、云端 Docker RepoDigest。包自己的安装脚本可能额外联网，真正隔离环境需阻断网络并验证，不承诺任意包脚本绝不联网。
+
+默认缓存是工具包中的 `downloads`，可用 `--cache /目录` / `-Cache C:\目录` 指定。运行目录、缓存和工作区必须相互独立。首次没有某平台随包 lock 时会解析官方版本并保存；已有安装使用自身 lock，不随包中的新版本自动升级。
+
+工具包已包含约 1.2 MiB 的 NSSM ZIP 和 ACP VSIX，每次使用仍校验哈希，无需在目标机再次下载；来源和原始许可见 [assets/README.md](../assets/README.md)。其余大型程序、系统依赖、npm 包与 Docker 镜像需要下载或预备缓存。
+
+可在网络好的机器预下载核心程序：
+
+```bash
+python3 scripts/download.py fetch --lock examples/windows-amd64.lock.json \
+  --cache downloads --segmented --workers 8
+```
+
+然后安全复制 lock 和缓存。NSSM 与 ACP 扩展的资源记录在 `examples/nssm.lock.json` 和 `examples/acp-extension.lock.json`，可用 `scripts/download-file.py` 按其中 URL/hash 预下载到对应文件名。扩展也可用 `--vsix /文件 --vsix-sha256 HASH`（Windows 对应 `-Vsix` / `-VsixSha256`）。VSIX 使用普通校验下载以处理市场的 gzip 响应。
+
+npm 缓存位于 `downloads/npm`。离线 AI 安装还需从相同系统/架构的已安装目录复制 `agents/package.json`、`agents/package-lock.json` 及完整缓存；不要跨 Windows/Mac 复制 node_modules。可先以 `--no-agents` 完成运行目录安装，再复制 agents 锁文件、重跑去掉该选项。云端镜像可在联网机器 `docker save`，目标机 `docker load`，必须保留 RepoDigest，再执行一键安装的 `--offline`。
+
+只需要 IDE 时可加 `--no-agents --no-extension`（Windows：`-NoAgents -NoExtension`）。不注册常驻服务加 `--no-service` / `-NoService`，随后分别在终端运行 `local.py run-ide`、`run-frpc`，再 `doctor`。
+
+## AI 登录与 iPad 接入
+
+AI 账号认证和 iPad 证书信任不能通过服务器脚本代办。请在家庭电脑上运行：
+
+```powershell
+# Windows
+python scripts/agents.py --root "$env:USERPROFILE\RemoteCode" exec codex -- login
+python scripts/agents.py --root "$env:USERPROFILE\RemoteCode" exec claude
+python scripts/local.py --root "$env:USERPROFILE\RemoteCode" url --show-secrets
+```
+
+```bash
+# macOS / Linux
+python3 scripts/agents.py --root "$HOME/RemoteCode" exec codex -- login
+python3 scripts/agents.py --root "$HOME/RemoteCode" exec claude
+python3 scripts/local.py --root "$HOME/RemoteCode" url --show-secrets
+```
+
+若 Python 没在 PATH，用入口检查到的解释器路径或 Windows `py -3`。只在自己终端查看首次 token 链接和 Basic Auth 密码，不公开转发。优先在家庭电脑完成 OAuth，避免 iPad 的 localhost 回调指向错误设备。
+
+将 `root-ca.crt` 公共证书传给 iPad，安装描述文件，再到“设置 → 通用 → 关于本机 → 证书信任设置”开启完全信任。使用首次 token 链接访问、输入 Basic Auth 后，收藏不含 token 的 `https://IP/m/pc1/`。如果初始化时用 `--cert/--key` 提供浏览器信任的公网 IP 证书，可省略浏览器的私人 CA 信任步骤。
+
+在 IDE 的 ACP 列表选择 **Codex (local ACP)** 或 **Claude (local ACP)**。终端执行 `hostname` 确认是家庭电脑，再验证编辑、ACP 权限确认、蜂窝网络和断线重连。WebView 仍可能请求 `*.vscode-cdn.net`；本机 CLI 默认访问在线模型，不等于本地推理。
+
+## 查看状态、新增机器与卸载
+
+```bash
+# 云端（每次使用与安装时相同的 --state）
+sudo bash deploy-cloud.sh status --state /opt/remotecode-state
+sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine mac1 --state /opt/remotecode-state --cn
+sudo bash deploy-cloud.sh uninstall --state /opt/remotecode-state
+# 彻底删除云端密钥、证书、配对包：额外加 --purge
+
+# macOS / Linux
+bash deploy-local.sh status
+bash deploy-local.sh uninstall
+# 彻底删除专用运行目录：额外加 --purge
+```
+
+```powershell
+# Windows（普通 PowerShell，移除服务时自动弹 UAC）
+powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy-local.ps1 -Action Status
+powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy-local.ps1 -Action Uninstall
+# 彻底删除专用运行目录：额外加 -Purge
+```
+
+卸载默认停用并移除本项目运行项/容器，保留运行目录，便于恢复；加 purge 才删除专用 state/root。重复卸载不会报“尚未安装”，但遇到非本项目目录会拒绝删除。共享 Python、Node、Git、Docker、软件源、下载缓存、项目及 `.codex` / `.claude` 认证资料均保留。不执行全局 Docker prune。iPad CA 和云安全组需自行按需清理。
+
+撤销机器、轮换凭据、证书更新和升级见[维护文档](operations.md)。当前验证范围与未验证平台见[验证记录](verification.md)。

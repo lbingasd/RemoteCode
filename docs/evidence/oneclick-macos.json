@@ -1,0 +1,15 @@
+{
+  "scope": "macOS real installer with cached assets; no system dependency installation, Linux Docker, Windows, iPad or model calls",
+  "checks": [
+    "fresh offline runtime and real VSIX install via deploy-local.sh",
+    "rerun retains credentials, program files and installed extension",
+    "resume from npm lock; real cached npm ci; subsequent run skips ci; JSONC settings retained",
+    "real LaunchAgents install + identical rerun + doctor against local TLS fixture and native IDE",
+    "real IDE HTTP 200 with token/cookie authentication",
+    "changed pairing refused without overwriting credentials",
+    "purge and repeated uninstall preserve workspace; no test services remain"
+  ],
+  "status": "PASS",
+  "system_dependencies_modified": false,
+  "real_model_requests": 0
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "agent": "Codex",
+    "protocolVersion": 1,
+    "authMethodCount": 2,
+    "status": "PASS"
+  },
+  {
+    "agent": "Claude",
+    "protocolVersion": 1,
+    "authMethodCount": 0,
+    "status": "PASS"
+  }
+]

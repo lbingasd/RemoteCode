@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "platform": "windows-amd64",
+  "frp_version": "0.71.1",
+  "vscode_version": "1.143.0",
+  "server_commit": "2d0b7506a36c1d6db9a466440131a8e01eab2289",
+  "files": {
+    "frp": {
+      "name": "frp_0.71.1_windows_amd64.zip",
+      "url": "https://github.com/fatedier/frp/releases/download/v0.71.1/frp_0.71.1_windows_amd64.zip",
+      "sha256": "b90074b2b6a1d792a7a40f085ac6d276bcab2d1bc60201f8a86ca53ce65ce821"
+    },
+    "vscode_web": {
+      "name": "vscode-web-1.143.0-windows-amd64.zip",
+      "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/2d0b7506a36c1d6db9a466440131a8e01eab2289/vscode-server-win32-x64-web.zip",
+      "sha256": "234bb03c880cf58930396cfd0c437204a156d24a432f090b121b4ddc0c026ffe"
+    }
+  }
+}

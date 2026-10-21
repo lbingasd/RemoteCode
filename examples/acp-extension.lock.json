@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "version": "0.2.0",
+  "name": "formulahendry.acp-client-0.2.0.vsix",
+  "url": "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/formulahendry/vsextensions/acp-client/0.2.0/vspackage",
+  "sha256": "aef8eabe9d311e07c8a34eaaa8c2a965ddb8d06a00f09d651fab54557de55139",
+  "source": "Official Marketplace HTTPS download verified on 2026-10-21; content fingerprint, not an upstream detached signature"
+}
