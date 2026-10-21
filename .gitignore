@@ -19,3 +19,4 @@ state.json
 node_modules/
 .idea/
 .vscode/
+.bootstrap/

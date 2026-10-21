@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "date": "2026-10-21",
+  "target": "Ubuntu 22.04 x64 (system Python 3.10)",
+  "targeted_tests_passed": 9,
+  "bootstrap_syntax_minimum": "Python 3.8",
+  "archive_validation_interpreter": "3.11.4",
+  "archive": "cpython-3.12.15+20261020-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+  "sha256": "7d6ef1164fb94c4b60d913340610fc7e0ef8e3d1b705aa5628b299b08cbdd4b5",
+  "bytes": 34479233,
+  "members_validated": 4536,
+  "scope": "Mac host: shell fallback simulation, safe-extraction fixtures, rollback/reuse, real Linux archive SHA-256/member validation; Linux interpreter and apt/Docker not executed",
+  "linux_native_execution": false,
+  "system_python_modified": false
+}

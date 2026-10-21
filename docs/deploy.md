@@ -4,7 +4,7 @@
 
 ## 云服务器：一条安装命令
 
-推荐 Ubuntu 24.04+ / Debian 13+，x64 或 ARM64。脚本自动检查并通过 apt 安装 Python 3.12+、curl、CA、OpenSSL、Docker Engine 和 Compose 插件，启用 Docker 开机启动。已有可用 Docker 保留，不自动替换冲突的容器运行时。
+支持 Ubuntu 22.04+ / Debian 12+，x64 或 ARM64。脚本自动检查 curl、CA、OpenSSL、Docker Engine 和 Compose 插件，补齐缺失依赖并启用 Docker 开机启动。部署程序使用 Python 3.12+；如果系统只有 Python 3.10/3.11，会用旧 Python 下载并校验私有 Python 3.12，安装在工具包的 `.bootstrap/python`。已有可用 Docker 保留，不自动替换冲突的容器运行时。
 
 ```bash
 sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc1 --cn
@@ -19,7 +19,11 @@ sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc1 \
   --state /opt/remotecode-state --cn
 ```
 
-已有 Python 3.12+ 的较旧 Ubuntu/Debian 可继续使用；其他 Linux 发行版请先安装依赖，再加 `--skip-deps`。无 Python 3.12+ 的旧发行版不会被自动添加第三方 Python PPA。云端 Windows Server / macOS 请使用 Linux VM 执行此入口；本脚本不自动创建虚拟机，也不把 Windows 容器当作替代品。
+**Ubuntu 22.04 不需要升级系统或手动替换 Python。** 私有解释器来自 Astral 的 `python-build-standalone`，版本和官方发布 SHA-256 固定在 `examples/python-bootstrap.lock.json`，支持同一 `--mirror` 和 `--cache` 参数以及分段续传。不会改动 `/usr/bin/python3`、系统默认 Python 或添加第三方 Python PPA；重跑、状态检查和卸载会自动找到已安装的私有解释器。
+
+`--skip-deps` / `--offline` 不会自动下载私有解释器，需先完成一次联网引导或自行提供 Python 3.12+。其他 Linux 发行版预装依赖后加 `--skip-deps`；更旧 Ubuntu/Debian 的 Docker 软件源仍需单独验证。云端 Windows Server / macOS 请使用 Linux VM 执行此入口；本脚本不自动创建虚拟机，也不把 Windows 容器当作替代品。
+
+使用私有解释器后，日常操作继续运行 `deploy-cloud.sh` 即可；若手动调用底层维护脚本，请用 `./.bootstrap/python/bin/python3 scripts/cloud.py ...`，避免又调用系统的旧 Python。私有解释器和下载缓存随普通卸载/`--purge` 保留；确认无部署依赖它后，才自行清理工具包内 `.bootstrap`。
 
 ### 国内网络与镜像
 

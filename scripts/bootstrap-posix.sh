@@ -6,13 +6,22 @@ rc_as_root() {
 }
 rc_python() {
     local candidate
-    for candidate in "${REMOTECODE_PYTHON:-}" python3.13 python3.12 python3 /opt/homebrew/opt/python@3.12/bin/python3.12 /usr/local/opt/python@3.12/bin/python3.12; do
+    for candidate in "${REMOTECODE_PYTHON:-}" "$RC_PACKAGE/.bootstrap/python/bin/python3" python3.13 python3.12 python3 /opt/homebrew/opt/python@3.12/bin/python3.12 /usr/local/opt/python@3.12/bin/python3.12; do
         [ -n "$candidate" ] || continue
         if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys; sys.exit(sys.version_info < (3,12))' >/dev/null 2>&1; then
             RC_PYTHON=$(command -v "$candidate"); return 0
         fi
     done
     return 1
+}
+rc_ensure_linux_python() {
+    if rc_python; then return; fi
+    # Use the old system interpreter only to fetch a private, version-locked one.
+    python3 -c 'import sys; sys.exit(sys.version_info < (3,8))' >/dev/null 2>&1 || rc_die 'Private bootstrap needs system Python 3.8+ (Ubuntu 20.04+/Debian 11+).'
+    local python_args=(--prefix "$RC_PACKAGE/.bootstrap/python" --cache "$RC_DOWNLOAD_CACHE/bootstrap")
+    [ -z "$RC_DOWNLOAD_MIRROR" ] || python_args+=(--mirror "$RC_DOWNLOAD_MIRROR")
+    python3 "$RC_PACKAGE/scripts/bootstrap-python.py" "${python_args[@]}"
+    rc_python || rc_die 'Private Python bootstrap failed; cached downloads are retained.'
 }
 rc_apt() {
     # Use a temporary, distro-signed source list when --cn was explicitly chosen.
@@ -75,19 +84,27 @@ rc_docker() {
     docker info >/dev/null || rc_die 'Docker daemon is unavailable. Cloud entrypoint must run with Docker access.'
 }
 rc_bootstrap() {
-    local role="$1" action arg skip=0 help=0 system brewbin accepted=0 agents=1
+    local role="$1" action arg skip=0 help=0 system brewbin accepted=0 agents=1 previous=''
     shift
     action=${1:-}
     RC_CN=0
+    RC_DOWNLOAD_MIRROR=''
+    RC_DOWNLOAD_CACHE="$RC_PACKAGE/downloads"
     for arg in "$@"; do
+        if [ "$previous" = --mirror ]; then RC_DOWNLOAD_MIRROR="$arg"; previous=''; continue; fi
+        if [ "$previous" = --cache ]; then RC_DOWNLOAD_CACHE="$arg"; previous=''; continue; fi
         case "$arg" in
             --cn) RC_CN=1 ;;
             --skip-deps|--offline) skip=1 ;;
             -h|--help) help=1 ;;
             --accept-license) accepted=1 ;;
             --no-agents) agents=0 ;;
+            --mirror|--cache) previous="$arg" ;;
+            --mirror=*) RC_DOWNLOAD_MIRROR=${arg#--mirror=} ;;
+            --cache=*) RC_DOWNLOAD_CACHE=${arg#--cache=} ;;
         esac
     done
+    [ -z "$previous" ] || rc_die "$previous requires a value."
     system=$(uname -s)
     if [ "$help" -eq 1 ]; then
         if rc_python; then return; fi
@@ -120,20 +137,13 @@ rc_bootstrap() {
             [ -r /etc/os-release ] || rc_die 'Missing /etc/os-release; preinstall dependencies and use --skip-deps.'
             . /etc/os-release
             case "$ID" in ubuntu|debian) ;; *) rc_die 'Auto dependencies support Ubuntu/Debian. Other distributions: preinstall Python 3.12+, curl, Git/Docker and use --skip-deps.' ;; esac
-            # Validate Python availability before modifying the system.
-            if ! rc_python; then
-                case "$ID:$VERSION_ID" in
-                    ubuntu:2[4-9].*|debian:1[3-9]*) ;;
-                    *) rc_die 'This OS does not ship Python 3.12+. Use Ubuntu 24.04+/Debian 13+, or preinstall Python 3.12+ and rerun.' ;;
-                esac
-            fi
             # HTTPS apt mirrors need the system CA bundle before switching sources.
             if [ ! -s /etc/ssl/certs/ca-certificates.crt ]; then
                 rc_as_root apt-get -o Acquire::Retries=3 update
                 rc_as_root apt-get -o Acquire::Retries=3 install -y ca-certificates
             fi
             local packages=()
-            if ! rc_python; then packages+=(python3); fi
+            command -v python3 >/dev/null 2>&1 || packages+=(python3)
             command -v curl >/dev/null 2>&1 || packages+=(curl)
             if [ "$role" = cloud ]; then
                 command -v openssl >/dev/null 2>&1 || packages+=(openssl)
@@ -144,7 +154,7 @@ rc_bootstrap() {
                 rc_apt update
                 rc_apt install -y "${packages[@]}"
             fi
-            rc_python || rc_die 'Distribution Python is below 3.12; install a supported Python and rerun.'
+            rc_ensure_linux_python
             [ "$role" != cloud ] || rc_docker
             ;;
         Darwin)

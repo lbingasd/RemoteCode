@@ -131,3 +131,17 @@ python3 scripts/build-package.py
 ```
 
 一键脚本没有代办 iPad 证书信任、AI 账号登录、云安全组或休眠策略。Windows/Linux/iPad 和真实跨网未完成项仍按上表与前文记录保留，不能将 Mac smoke 提升为这些目标环境已部署的证据。
+
+## Ubuntu 22.04 的 Python 引导修复（2026-10-21）
+
+用户在 Ubuntu 22.04 64 位部署时遇到 `This OS does not ship Python 3.12+`。旧入口按发行版版本直接退出，未给系统 Python 3.10 提供引导路径。现改为保留系统 Python，通过可由 Python 3.8+ 运行的引导器安装私有 Python 3.12.15；不使用 Python PPA，不改系统默认解释器。发行包来自 [Astral 官方项目](https://github.com/astral-sh/python-build-standalone/releases/tag/20261020)，这是 [uv 使用的同类独立 Python 发行方式](https://docs.astral.sh/uv/concepts/python-versions/)。
+
+本次按改动范围执行 **9 项定向检查通过**（7 项私有 Python 引导、2 项现有入口检查），未重跑整个原生链路或所有历史测试。检查涵盖旧解释器回退、镜像/缓存参数转发、私有解释器查找、重复执行复用、失败不发布半成品、归档越界/特殊文件/链接拒绝，以及 Python 3.8 语法兼容。实际下载了约 34.5 MB 的 Linux x64 Python 归档，SHA-256 与官方 release digest 一致，使用 Python 3.11 校验所有归档成员与链接及 ELF 头。[记录](evidence/python-bootstrap.json)
+
+当前宿主是 Mac，Linux 归档的大小写敏感 terminfo 文件不能按原样在本机默认文件系统完整解压；安全解压逻辑用独立夹具验证，真实归档完成全部成员预检。未在 Mac 执行 Linux 二进制，也未执行 Ubuntu 的 apt/Docker，不能把本次检查表述为 Ubuntu 22.04 已实际部署通过。目标服务器更新仓库后重跑原安装命令验证。
+
+```bash
+python3 -m unittest discover -s tests -p 'test_python_bootstrap.py'
+python3 -m unittest discover -s tests -p 'test_bootstrap.py'
+bash -n scripts/bootstrap-posix.sh
+```

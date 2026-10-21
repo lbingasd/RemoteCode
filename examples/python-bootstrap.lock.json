@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "release": "20261020",
+  "source": "https://github.com/astral-sh/python-build-standalone/releases/tag/20261020",
+  "files": {
+    "linux-amd64": {
+      "name": "cpython-3.12.15+20261020-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261020/cpython-3.12.15%2B20261020-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "sha256": "7d6ef1164fb94c4b60d913340610fc7e0ef8e3d1b705aa5628b299b08cbdd4b5"
+    },
+    "linux-arm64": {
+      "name": "cpython-3.12.15+20261020-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261020/cpython-3.12.15%2B20261020-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "sha256": "6d129ebdfa88ef11a78c42bd11426c17fad28a42ae20257c1b242cb7e971a235"
+    }
+  }
+}

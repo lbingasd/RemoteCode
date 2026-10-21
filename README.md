@@ -49,7 +49,7 @@ frpc 直接连接公网 IP，并用 `pc1.tunnel.invalid` 这样的内部 SNI 标
 | 云端 macOS / Windows 10、11 | Docker Desktop 的 Linux 容器 | 适合测试/个人使用；Docker Desktop 通常需要用户登录后启动。 |
 | 云端 Windows Server | Linux VM 内运行上述云端方案 | 不把 Docker Desktop 或 Windows 容器当作 Windows Server 上的等价实现。虚拟机需正确转发 TCP 443。 |
 
-脚本需要 Python **3.12+**；一键入口会检查并安装缺失依赖。云端自动安装范围为 Ubuntu 24.04+/Debian 13+（已有 Python 3.12+ 的较旧系统也可）；Windows 本机使用 WinGet，macOS 使用 Homebrew。Windows x64 的 NSSM 按微软 manifest 中的哈希自动下载校验。卸载保留共享 Python、Docker、Node、Git，避免影响其他项目。详情见部署文档中的系统范围和镜像限制。
+部署工具使用 Python **3.12+**；一键入口会检查并安装缺失依赖。Ubuntu 22.04+/Debian 12+ 可直接部署：系统 Python 较旧时，自动在工具包的 `.bootstrap/python` 安装已锁定并校验的私有 Python 3.12，保留系统 Python，不添加第三方 PPA。Windows 本机使用 WinGet，macOS 使用 Homebrew。Windows x64 的 NSSM 按微软 manifest 中的哈希自动下载校验。卸载保留共享依赖和私有引导解释器，避免影响其他部署。详情见部署文档中的系统范围和镜像限制。
 
 ## 从哪里开始
 
