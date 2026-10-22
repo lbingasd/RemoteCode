@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 
 const MAX_IMAGE = 10 * 1024 * 1024;
+const SENSITIVE_KEY = /(?:api[_-]?key|secret|token|password|authorization)/i;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 export const cancelled = () => ({outcome: {outcome: 'cancelled'}});
 export function atomic(file, value) {
@@ -165,21 +166,29 @@ export class Bridge {
     for (const secret of [this.config?.app_secret, this.api?.token]) if (secret) text = text.split(secret).join('[REDACTED]');
     return text.replace(/((?:api[_-]?key|secret|token|password|authorization)\s*[=:]\s*)(?:"[^"]*"|'[^']*'|[^\s,}]+)/gi, '$1[REDACTED]');
   }
+  markdownInline(value) {
+    // Collapse line breaks and backticks, then wrap in a code span so link/bold/heading
+    // syntax in model-supplied text is shown literally instead of being interpreted.
+    return '`' + String(value).replace(/`/g, "'").replace(/[\r\n\t]+/g, ' ') + '`';
+  }
   formatDetails(toolCall) {
-    // Render the raw tool input as readable key/value lines instead of a JSON blob.
+    // Render the raw tool input as readable key/value lines instead of a JSON blob,
+    // with each key and value neutralized against QQ markdown injection.
     const raw = toolCall?.rawInput;
     let text = '';
     if (raw && typeof raw === 'object') {
       const lines = [];
       for (const [key, value] of Object.entries(raw)) {
         if (value === undefined || value === null || value === '') continue;
-        lines.push(`- ${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`);
+        const rendered = SENSITIVE_KEY.test(String(key)) ? '[REDACTED]'
+          : (typeof value === 'string' ? value : JSON.stringify(value));
+        lines.push(`- ${this.markdownInline(key)}: ${this.markdownInline(rendered)}`);
       }
       text = lines.join('\n');
     } else if (typeof raw === 'string' && raw.trim()) {
-      text = raw.trim();
+      text = this.markdownInline(raw.trim());
     }
-    if (!text && typeof toolCall?.content === 'string') text = toolCall.content;
+    if (!text && typeof toolCall?.content === 'string') text = this.markdownInline(toolCall.content);
     return this.scrub(text.slice(0, 1800));
   }
   approvalKeyboard(id) {
@@ -219,7 +228,7 @@ export class Bridge {
       expires: this.clock() + 300000, lease: this.clock(), delivering: true, result: null};
     this.pending.set(id, p);
     const details = this.formatDetails(params.toolCall);
-    const title = this.scrub(String(params.toolCall.title || '操作审批').slice(0, 300));
+    const title = this.markdownInline(this.scrub(String(params.toolCall.title || '操作审批').slice(0, 300)));
     try {
       await this.notifyApproval(p, title, details);
       p.delivering = false; p.lease = this.clock();

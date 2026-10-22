@@ -207,10 +207,10 @@ test('approval sends structured markdown with tap buttons and no link; text fall
   assert.equal(kind, 'markdown'); assert.equal(user, 'owner');
   assert.equal(content.startsWith('# RemoteCode · mac1'), true);
   assert.ok(content.includes(`**审批码** ${id}`));
-  assert.ok(content.includes('**标题** Run test'));
+  assert.ok(content.includes('**标题** `Run test`'));
   assert.ok(content.includes('**会话** session1'));
   assert.ok(content.includes('**详情**'));
-  assert.ok(content.includes('- command: npm test'));
+  assert.ok(content.includes('- `command`: `npm test`'));
   assert.equal(content.includes('{"command"'), false);
   assert.equal(content.includes('查看截图'), false);
   assert.ok(content.includes(`- 同意 ${id} / 拒绝 ${id}`));
@@ -223,6 +223,17 @@ test('approval sends structured markdown with tap buttons and no link; text fall
   assert.equal((await b2.register(body2)).route, 'qq');
   assert.equal(sent2.at(-1)[0], 'text');
   assert.equal(sent2.at(-1)[2].includes('https://1.2.3.4'), false);
+});
+test('sensitive rawInput keys are fully redacted and markdown syntax is neutralized', async t => {
+  const {bridge, sent} = fixture(t);
+  const body = {connection: 'c1', request_key: 'r1', params: {sessionId: 's1',
+    toolCall: {title: 't', rawInput: {command: '# [phish](http://evil)\n**bold**', token: 'secret phrase'}},
+    options: [{kind: 'allow_once', optionId: 'YES'}]}};
+  await bridge.register(body);
+  const content = sent.at(-1)[2];
+  assert.ok(content.includes('- `command`: `# [phish](http://evil) **bold**`'));
+  assert.ok(content.includes('`[REDACTED]`'));
+  assert.equal(content.includes('secret phrase'), false);
 });
 test('image delivery sends only the image, with no trailing text or link', async t => {
   const {bridge, sent} = fixture(t);
