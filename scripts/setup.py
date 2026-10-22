@@ -269,19 +269,19 @@ def ensure_node(root, args):
     return str(private_node)
 
 
-def agent_identity(root):
-    """Skip npm ci only when the lock, interpreter and actual executables are intact."""
-    from agents import PACKAGES, executable
+def agent_identity(root, cli_paths):
+    """Skip npm ci only when the adapter lock/interpreter are intact; include resolved CLIs."""
+    from agents import ADAPTERS, executable
     node = shutil.which("node")
     lock = root / "agents/package-lock.json"
     if not lock.is_file() or not node:
         return None
     try:
-        for name, package in PACKAGES.items():
+        for name, package in ADAPTERS.items():
             executable(root, node, name)
             require(read(root / "agents/node_modules" / package / "package.json")["version"] ==
                     read(root / "agents/package.json")["dependencies"][package], "版本不完整")
-        return {"lock": sha256(lock), "node": str(Path(node).resolve())}
+        return {"lock": sha256(lock), "node": str(Path(node).resolve()), "clis": cli_paths}
     except (OSError, ValueError, KeyError, StopIteration):
         return None
 
@@ -512,15 +512,22 @@ def home_setup(args, root):
     if not args.no_agents:
         require(shutil.which("git"), "缺少 Git，取消 --skip-deps 或先安装 Git")
         ensure_node(root, args)
-        identity = agent_identity(root)
+        from agents import resolve_clis
+        cli_paths = resolve_clis(args)
+        cli_extra = []
+        if args.codex_path:
+            cli_extra += ["--codex-path", str(args.codex_path)]
+        if args.claude_path:
+            cli_extra += ["--claude-path", str(args.claude_path)]
+        identity = agent_identity(root, cli_paths)
         if not identity or identity != progress.get("agents"):
             extra = ["--offline"] if args.offline else []
-            script("agents.py", "--root", root, "install", "--registry", args.registry,
+            script("agents.py", "--root", root, *cli_extra, "install", "--registry", args.registry,
                    "--npm-cache", args.cache / "npm", *extra)
-            progress["agents"] = agent_identity(root)
+            progress["agents"] = agent_identity(root, cli_paths)
             write(setupfile, progress)
         else:
-            script("agents.py", "--root", root, "settings")
+            script("agents.py", "--root", root, *cli_extra, "settings")
             print("CLI/ACP 已安装且版本一致，跳过 npm ci。")
         merge_settings(root)
     if not args.no_extension:
@@ -578,6 +585,8 @@ def parser():
     p.add_argument("--root", type=Path, default=Path.home() / "RemoteCode")
     p.add_argument("--bundle", type=Path)
     p.add_argument("--workspace", type=Path)
+    p.add_argument("--codex-path", type=Path, help="前置 Codex CLI 绝对路径；默认从 PATH 查找")
+    p.add_argument("--claude-path", type=Path, help="前置 Claude CLI 绝对路径；默认从 PATH 查找")
     p.add_argument("--accept-license", action="store_true")
     p.add_argument("--no-agents", action="store_true")
     p.add_argument("--no-extension", action="store_true")

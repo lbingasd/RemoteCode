@@ -89,20 +89,27 @@ def main():
             require(workbench.read_bytes() == patched, "重跑重复修改 WebView")
             report["checks"].append("rerun retains credentials, program files and installed extension")
             if args.npm_cache:
-                # Simulate an interrupted install after package-lock creation.
+                # Deterministic resume test: stub the prerequisite CLIs so the lock stays
+                # adapters-only, then simulate an interrupted install after lock creation.
+                from agents import ADAPTERS
+                stub = base / "cli-stub"
+                stub.write_text("#!/bin/sh\nexit 0\n")
+                stub.chmod(0o755)
+                command += ["--codex-path", str(stub), "--claude-path", str(stub)]
                 versions = read(PACKAGE / "examples/agents-tested-versions.json")["packages"]
-                write(root / "agents/package.json", {"name": "remotecode-local-agents", "version": "1.0.0", "private": True, "dependencies": versions})
+                adapters = {key: versions[ADAPTERS[key]] for key in ADAPTERS}
+                write(root / "agents/package.json", {"name": "remotecode-local-agents", "version": "1.0.0", "private": True, "dependencies": adapters})
                 (cache / "npm").symlink_to(args.npm_cache.resolve(), target_is_directory=True)
                 run(npm_command(shutil.which("node")) + ["install", "--package-lock-only", "--offline", "--prefix", str(root / "agents"), "--cache", str(cache / "npm"), "--no-audit", "--no-fund"])
                 command.remove("--no-agents")
                 run(command)
                 marker = read(root / "setup.json")
                 require(marker.get("agents"), "代理安装标记缺失")
-                module_inode = (root / "agents/node_modules/@openai/codex/package.json").stat().st_ino
+                module_inode = (root / "agents/node_modules/@agentclientprotocol/codex-acp/package.json").stat().st_ino
                 settings = root / "data/data/Machine/settings.json"
                 settings.write_text('// retain my settings\n' + settings.read_text().rstrip()[:-1] + ', "editor.fontSize":19,}\n')
                 run(command)
-                require((root / "agents/node_modules/@openai/codex/package.json").stat().st_ino == module_inode, "重跑仍然执行了 npm ci")
+                require((root / "agents/node_modules/@agentclientprotocol/codex-acp/package.json").stat().st_ino == module_inode, "重跑仍然执行了 npm ci")
                 require(read(settings)["editor.fontSize"] == 19, "用户设置丢失")
                 report["checks"].append("resume from npm lock; real cached npm ci; subsequent run skips ci; JSONC settings retained")
             if args.with_services:
