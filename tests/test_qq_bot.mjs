@@ -210,6 +210,9 @@ test('approval sends structured markdown with tap buttons and no link; text fall
   assert.ok(content.includes('**标题** Run test'));
   assert.ok(content.includes('**会话** session1'));
   assert.ok(content.includes('**详情**'));
+  assert.ok(content.includes('- command: npm test'));
+  assert.equal(content.includes('{"command"'), false);
+  assert.equal(content.includes('查看截图'), false);
   assert.ok(content.includes(`- 同意 ${id} / 拒绝 ${id}`));
   assert.equal(content.includes('https://1.2.3.4'), false);
   assert.equal(keyboard.content.rows.length, 1);

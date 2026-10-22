@@ -165,6 +165,23 @@ export class Bridge {
     for (const secret of [this.config?.app_secret, this.api?.token]) if (secret) text = text.split(secret).join('[REDACTED]');
     return text.replace(/((?:api[_-]?key|secret|token|password|authorization)\s*[=:]\s*)(?:"[^"]*"|'[^']*'|[^\s,}]+)/gi, '$1[REDACTED]');
   }
+  formatDetails(toolCall) {
+    // Render the raw tool input as readable key/value lines instead of a JSON blob.
+    const raw = toolCall?.rawInput;
+    let text = '';
+    if (raw && typeof raw === 'object') {
+      const lines = [];
+      for (const [key, value] of Object.entries(raw)) {
+        if (value === undefined || value === null || value === '') continue;
+        lines.push(`- ${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`);
+      }
+      text = lines.join('\n');
+    } else if (typeof raw === 'string' && raw.trim()) {
+      text = raw.trim();
+    }
+    if (!text && typeof toolCall?.content === 'string') text = toolCall.content;
+    return this.scrub(text.slice(0, 1800));
+  }
   approvalKeyboard(id) {
     const callback = (key, label, visited, style, tips) => ({id: key,
       render_data: {label, visited_label: visited, style},
@@ -182,8 +199,7 @@ export class Bridge {
       `**会话** ${p.session}`, '',
       '**详情**', details, '',
       '点击下方按钮，或 5 分钟内回复：',
-      `- 同意 ${p.id} / 拒绝 ${p.id}`,
-      `- 查看截图 ${p.id}`, '',
+      `- 同意 ${p.id} / 拒绝 ${p.id}`, '',
       '仅允许一次；信息不足时请拒绝并在 IDE 中核实。'];
     await this.api.markdown(this.binding.user_openid, lines.join('\n'), this.approvalKeyboard(p.id));
   }
@@ -202,7 +218,7 @@ export class Bridge {
       options: params.options.filter(o => ['allow_once', 'reject_once'].includes(o.kind) && typeof o.optionId === 'string'),
       expires: this.clock() + 300000, lease: this.clock(), delivering: true, result: null};
     this.pending.set(id, p);
-    const details = this.scrub(JSON.stringify(params.toolCall.rawInput ?? params.toolCall.content ?? '').slice(0, 1800));
+    const details = this.formatDetails(params.toolCall);
     const title = this.scrub(String(params.toolCall.title || '操作审批').slice(0, 300));
     try {
       await this.notifyApproval(p, title, details);
@@ -212,8 +228,8 @@ export class Bridge {
     } catch (e) {
       // Markdown/keyboard may be rejected or unsupported (e.g. sandbox): retry as plain text.
       try {
-        const lines = [`RemoteCode · ${this.local.id}`, `审批码 ${id}`, `标题 ${title}`, `会话 ${p.session}`, `详情 ${details}`,
-          '', '5 分钟内回复：', '1 同意一次', '2 拒绝一次', `或 同意 ${id} / 拒绝 ${id}`, `查看截图 ${id}`,
+        const lines = [`RemoteCode · ${this.local.id}`, `审批码 ${id}`, `标题 ${title}`, `会话 ${p.session}`,
+          '详情：', details, '', '5 分钟内回复：', '1 同意一次', '2 拒绝一次', `或 同意 ${id} / 拒绝 ${id}`,
           '仅允许一次；信息不足时请拒绝并回 IDE 核实。'];
         await this.api.text(this.binding.user_openid, lines.join('\n'));
         p.delivering = false; p.lease = this.clock();

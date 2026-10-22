@@ -38,7 +38,7 @@ bash deploy-qq.sh configure --root "$HOME/RemoteCode"
 
 刷新浏览器 IDE，断开原 Codex 或 Claude 连接，选择新增的 **Codex (QQ approvals)** 或 **Claude (QQ approvals)**。它们分别代理现有 `@agentclientprotocol/codex-acp` / `@agentclientprotocol/claude-agent-acp` 的 stdio 连接，不另建模型会话；原 **Codex (local ACP)** 和 **Claude (local ACP)** 条目保留。
 
-Bot 在线且用户已绑定时，新增条目的 `session/request_permission` 请求交给 QQ。首版采用单一审批通道：该请求不会同时弹出 IDE 选择框。通知优先使用 QQ markdown，按标题、审批码、会话、详情分层排版，并附「同意一次 / 拒绝一次」回调按钮，点一下即可审批。点击按钮触发 `INTERACTION_CREATE`，Bot 在约 3 秒内回执 `PUT /interactions/{id}`，并按按钮携带的审批码精确匹配，安全边界与文字命令一致。markdown/按钮不可用（如沙箱）或发送失败时自动降级为纯文本通知。消息不再附带网页 IDE 链接。支持如下指令：
+Bot 在线且用户已绑定时，新增条目的 `session/request_permission` 请求交给 QQ。首版采用单一审批通道：该请求不会同时弹出 IDE 选择框。通知优先使用 QQ markdown，按标题、审批码、会话、详情分层排版（详情按原始输入键值结构化展示，而非 JSON 原文），并附「同意一次 / 拒绝一次」回调按钮，点一下即可审批。点击按钮触发 `INTERACTION_CREATE`，Bot 在约 3 秒内回执 `PUT /interactions/{id}`，并按按钮携带的审批码精确匹配，安全边界与文字命令一致。markdown/按钮不可用（如沙箱）或发送失败时自动降级为纯文本通知。消息不再附带网页 IDE 链接。支持如下指令：
 
 ```text
 1 同意一次
