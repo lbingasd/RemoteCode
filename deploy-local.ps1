@@ -1,5 +1,12 @@
 #Requires -Version 5.1
-<# Run as the ordinary developer account. Only service registration prompts for UAC. #>
+<#
+Home-machine Windows entrypoint; run as the ordinary developer account.
+Process: find Python -> WinGet deps (Python/Node/Git) -> setup.py local
+         (IDE/frpc -> runtime -> ACP adapters + prerequisite Codex/Claude
+         detection -> settings/extension -> NSSM service / scheduled task -> doctor).
+Required input: -Bundle <dir>, -Workspace <dir>, -AcceptLicense. Optional: -CN.
+Only service registration prompts for UAC.
+#>
 [CmdletBinding()]
 param(
     [ValidateSet('Install','Status','Uninstall')][string]$Action = 'Install',
