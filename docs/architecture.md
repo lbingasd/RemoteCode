@@ -75,7 +75,7 @@ Windows 家庭端 deploy-local.ps1
 | [download.py](../scripts/download.py) / [download-file.py](../scripts/download-file.py) / [transfer.py](../scripts/transfer.py) | 版本解析、SHA-256 校验、单文件及分段续传 |
 | [common.py](../scripts/common.py) | 文件写入、网络下载、镜像选择、进程调用和进度输出等公共能力 |
 | [container_images.py](../scripts/container_images.py) | nginx 容器镜像 digest 校验、多源拉取与缓存复用 |
-| [bootstrap-posix.sh](../scripts/bootstrap-posix.sh) / [bootstrap-python.py](../scripts/bootstrap-python.py) / [bootstrap-compose.py](../scripts/bootstrap-compose.py) | 系统依赖、私有 Python 和独立 Compose 插件引导 |
+| [bootstrap-posix.sh](../scripts/bootstrap-posix.sh) / [bootstrap-python.py](../scripts/bootstrap-python.py) / [bootstrap-compose.py](../scripts/bootstrap-compose.py) | 多发行版（apt/dnf/yum）系统依赖检测与安装、私有 Python 和独立 Compose 插件引导 |
 | [qq_bot.py](../scripts/qq_bot.py) / [qq-bot.mjs](../scripts/qq-bot.mjs) / [acp_qq_proxy.py](../scripts/acp_qq_proxy.py) | QQ 配置与服务安装；QQ 网关、审批、截图；ACP 代理 |
 | [update-deepseek-key.py](../scripts/update-deepseek-key.py) | 本机隐藏输入、验证并更新已有 Claude 配置中的 DeepSeek 凭据 |
 | [build-package.py](../scripts/build-package.py) | 按白名单生成可复现的部署 ZIP 与 SHA-256 |

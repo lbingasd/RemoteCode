@@ -4,7 +4,7 @@
 
 ## 云服务器：一条安装命令
 
-支持 Ubuntu 22.04+ / Debian 12+，x64 或 ARM64。脚本自动检查 curl、CA、OpenSSL、Docker Engine 和 Compose 插件，补齐缺失依赖并启用 Docker 开机启动。部署程序使用 Python 3.12+；如果系统只有 Python 3.10/3.11，会用旧 Python 下载并校验私有 Python 3.12，安装在工具包的 `.bootstrap/python`。已有可用 Docker 保留，不自动替换冲突的容器运行时。
+支持 Ubuntu 22.04+ / Debian 12+，以及 RHEL 家族（RHEL / Rocky / AlmaLinux / CentOS Stream 9、Amazon Linux 2023、openEuler 22.03+、Anolis 23 等），x64 或 ARM64。脚本自动检测发行版与包管理器，检查 curl、CA、OpenSSL、Docker Engine 和 Compose 插件，补齐缺失依赖并启用 Docker 开机启动。部署程序使用 Python 3.12+；系统 Python 低于 3.12 时，用 3.8+ 解释器下载并校验私有 Python 3.12，安装在工具包的 `.bootstrap/python`（RHEL 8 系先补装 python38，其余 RHEL 家族如 Alibaba Cloud Linux 3 补装 python3.11）。已有可用 Docker 保留，不自动替换冲突的容器运行时。
 
 ```bash
 sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc1 --cn
@@ -25,7 +25,7 @@ sudo ss -ltnp 'sport = :443'
 
 宿主机 nginx 的停用由你显式执行，RemoteCode 卸载不会自动恢复它。以后卸载 RemoteCode 并确认 443 空闲后，可用 `sudo systemctl enable --now nginx` 恢复。预检和实际 Docker 绑定之间仍存在时间窗口，最终以 Docker 启动结果为准。
 
-`--cn` 表示选择清华的 apt / Docker CE 软件仓库镜像；不加时使用系统现有 apt 源和 Docker 官方仓库。系统 apt 源不被改写；安装 Docker 时会保留其软件仓库配置供以后维护，不修改 `daemon.json`。执行过程中断后，重跑同一命令即可。
+`--cn` 表示选择清华的 apt / Docker CE 软件仓库镜像（Debian 家族）或清华 Docker CE 镜像（RHEL 家族）；不加时使用系统现有源和 Docker 官方仓库。系统源不被改写；安装 Docker 时会保留其软件仓库配置供以后维护，不修改 `daemon.json`。执行过程中断后，重跑同一命令即可。
 
 已有 Docker 但缺少 Compose 时，自动补装官方独立 CLI 插件到 `/usr/local/lib/docker/cli-plugins/docker-compose`，不替换 Docker、containerd 或现有容器。插件固定为 Compose 5.6.1（兼容这里使用的 Compose v2 命令接口），x64/ARM64 的官方 SHA-256 记录在 `examples/compose-plugin.lock.json`；支持下载续传、`--cache` 和 `--mirror`。已有可用 Compose 直接复用；已有不可用的同路径文件或符号链接不会被覆盖，需先检查其来源。自有 `DOCKER_CONFIG/cli-plugins` 中的坏插件可能遮挡系统插件，可用 `docker --help` 查看 Invalid Plugins 并处理对应文件。
 
@@ -57,7 +57,7 @@ sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc1 \
 
 **Ubuntu 22.04 不需要升级系统或手动替换 Python。** 私有解释器来自 Astral 的 `python-build-standalone`，版本和官方发布 SHA-256 固定在 `examples/python-bootstrap.lock.json`，支持同一 `--mirror` 和 `--cache` 参数以及分段续传。不会改动 `/usr/bin/python3`、系统默认 Python 或添加第三方 Python PPA；重跑、状态检查和卸载会自动找到已安装的私有解释器。
 
-`--skip-deps` / `--offline` 不会自动下载私有解释器，需先完成一次联网引导或自行提供 Python 3.12+。其他 Linux 发行版预装依赖后加 `--skip-deps`；更旧 Ubuntu/Debian 的 Docker 软件源仍需单独验证。云端 Windows Server / macOS 请使用 Linux VM 执行此入口；本脚本不自动创建虚拟机，也不把 Windows 容器当作替代品。
+`--skip-deps` / `--offline` 不会自动下载私有解释器，需先完成一次联网引导或自行提供 Python 3.12+。自动安装覆盖 Ubuntu/Debian 与 RHEL 家族；openSUSE/SLES、CentOS 7、Amazon Linux 2 等发行版预装依赖后加 `--skip-deps`。更旧 Ubuntu/Debian 的 Docker 软件源仍需单独验证。云端 Windows Server / macOS 请使用 Linux VM 执行此入口；本脚本不自动创建虚拟机，也不把 Windows 容器当作替代品。
 
 使用私有解释器后，日常操作继续运行 `deploy-cloud.sh` 即可；若手动调用底层维护脚本，请用 `./.bootstrap/python/bin/python3 scripts/cloud.py ...`，避免又调用系统的旧 Python。私有解释器和下载缓存随普通卸载/`--purge` 保留；确认无部署依赖它后，才自行清理工具包内 `.bootstrap`。
 
@@ -139,7 +139,7 @@ bash deploy-local.sh install --bundle ./mac1 --workspace "$HOME/Projects" \
 
 默认运行目录 `$HOME/RemoteCode`。macOS 通过 Homebrew 补齐 Python / Node / Git；缺少 Homebrew 时使用其官方安装脚本。`--cn` 临时传入清华 Homebrew API、bottles 和 Git 仓库镜像配置。若缺少 Apple Command Line Tools，脚本会唤起安装并退出，完成系统安装界面后重跑同一命令。必要的 sudo/系统交互不能由脚本静默绕过。
 
-Linux 的依赖自动安装范围同云端 Ubuntu/Debian。系统 Node 低于 22 时，在 RemoteCode 专用运行目录安装 Node 22 LTS，不替换其他项目的系统 Node。后续 `agents.py` 能定位此私有 Node。
+Linux 的依赖自动安装范围同云端（Ubuntu/Debian 与 RHEL 家族）。系统 Node 低于 22 时，在 RemoteCode 专用运行目录安装 Node 22 LTS，不替换其他项目的系统 Node。后续 `agents.py` 能定位此私有 Node。
 
 macOS 使用当前用户 LaunchAgents，需登录；Linux 使用 systemd 用户服务，无人登录启动时管理员可按需执行 `loginctl enable-linger 用户名`。脚本不自动改变休眠、FileVault/BitLocker 或账号安全策略。
 

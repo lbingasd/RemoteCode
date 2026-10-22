@@ -70,6 +70,7 @@ VS Code/frp 下载缓存位于当前电脑 `/private/tmp/remotecode-cache`。这
 | 项目 | 状态及原因 |
 |---|---|
 | Linux Docker 容器运行 | NOT RUN：无 Docker 守护进程/Linux VM；Compose 离线配置校验和原生 nginx/frp 验证已做，不能代替容器网络与重启验收 |
+| RHEL 家族云端自动安装 | NOT RUN：无 RHEL 云主机；发行版检测与包管理器分派已单测，Docker CE 仓库路径与发行版 `docker` 包名需在 Rocky/Alma 9、Amazon Linux 2023 等真实环境验收 |
 | Windows PowerShell/NSSM/任务计划 | NOT RUN：无 Windows；仍需真实验证 Windows PowerShell 5.1、ACL、NSSM、登录/无人登录重启两种场景 |
 | Linux systemd 安装与卸载 | NOT RUN：无 Linux 宿主；macOS launchd 已实测 |
 | Codex/Claude/ACP 登录与真实任务 | NOT RUN：初始化握手和 CLI 查询已通过，但未登录模型账号，也未验证实际对话/编辑任务 |

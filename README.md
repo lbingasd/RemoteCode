@@ -29,7 +29,7 @@ flowchart LR
 
 | 位置 | 准备条件 |
 |---|---|
-| 云端 | 推荐 Ubuntu 22.04+ / Debian 12+，x64 或 ARM64；TCP 443 可用，安全组/防火墙允许该入口 |
+| 云端 | Ubuntu 22.04+ / Debian 12+ / RHEL 家族（Rocky、Alma、CentOS Stream 9 等），x64 或 ARM64；TCP 443 可用，安全组/防火墙允许该入口 |
 | 家庭电脑 | Windows 10/11、macOS 或 Linux；以普通开发用户安装，项目目录与 RemoteCode 运行目录分开 |
 | iPad | Safari；默认使用个人 CA，需要安装并信任公共根证书 |
 
