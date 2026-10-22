@@ -177,30 +177,63 @@ class ConfigurationTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, expected):
                     qq_bot.validate_credentials({'app_id': '12345678', 'app_secret': 'SECRET'})
 
-    def test_install_repeat_preserves_credentials_custom_settings_and_original_agent(self):
+    def test_install_repeat_preserves_credentials_custom_settings_and_original_agents(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder) / 'runtime'; root.mkdir()
-            skill = Path(folder) / 'skills/remotecode-qq'
+            codex_skill = Path(folder) / 'codex/skills/remotecode-qq'
+            claude_skill = Path(folder) / 'claude/skills/remotecode-qq'
+            codex_agent = {'command': '/node', 'args': ['/codex-acp.js'], 'env': {'PATH': '/bin'}}
+            claude_agent = {'command': '/node', 'args': ['/claude-acp.js'], 'env': {'PATH': '/bin'}}
             qq_bot.write(root / 'local.json', {'id': 'test', 'local_port': 18080})
-            original_agent = {'command': '/node', 'args': ['/adapter.js'], 'env': {'PATH': '/bin'}}
             qq_bot.write(root / 'data/data/Machine/settings.json', {'editor.fontSize': 22,
-                'acp.agents': {'Codex (local ACP)': original_agent, 'custom': {'command': '/custom'}}})
-            with patch('agents.find_node', return_value='/node'), patch.object(qq_bot, 'skill_directory', return_value=skill):
+                'acp.agents': {'Codex (local ACP)': codex_agent, 'Claude (local ACP)': claude_agent,
+                               'custom': {'command': '/custom'}}})
+            with patch('agents.find_node', return_value='/node'), \
+                 patch.object(qq_bot, 'skill_directories', return_value=[codex_skill, claude_skill]):
                 qq_bot.install(root, no_service=True)
                 qq_bot.write(root / 'qq/config.json', {'app_secret': 'KEEP_SECRET'})
                 token = (root / 'qq/local-token').read_bytes()
                 qq_bot.install(root, no_service=True)
                 settings = qq_bot.read(root / 'data/data/Machine/settings.json')
                 self.assertEqual(settings['editor.fontSize'], 22)
-                self.assertEqual(settings['acp.agents']['Codex (local ACP)'], original_agent)
+                self.assertEqual(settings['acp.agents']['Codex (local ACP)'], codex_agent)
+                self.assertEqual(settings['acp.agents']['Claude (local ACP)'], claude_agent)
                 self.assertEqual(settings['acp.agents']['custom'], {'command': '/custom'})
                 self.assertIn('Codex (QQ approvals)', settings['acp.agents'])
+                self.assertIn('Claude (QQ approvals)', settings['acp.agents'])
+                self.assertIn('acp_qq_proxy.py', settings['acp.agents']['Claude (QQ approvals)']['args'][0])
                 self.assertEqual(qq_bot.read(root / 'qq/config.json')['app_secret'], 'KEEP_SECRET')
                 self.assertEqual((root / 'qq/local-token').read_bytes(), token)
-                self.assertIn(str(root), (skill / 'SKILL.md').read_text())
-                (skill / 'SKILL.md').write_text('user edited skill')
+                self.assertIn(str(root), (codex_skill / 'SKILL.md').read_text())
+                self.assertIn(str(root), (claude_skill / 'SKILL.md').read_text())
+                skills = qq_bot.read(root / 'qq/skills.json')
+                self.assertEqual({s['path'] for s in skills}, {str(codex_skill), str(claude_skill)})
+                (claude_skill / 'SKILL.md').write_text('user edited skill')
                 with self.assertRaisesRegex(ValueError, '拒绝覆盖'):
                     qq_bot.install(root, no_service=True)
+
+    def test_legacy_single_entry_and_skill_migrate_to_plural_manifests(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder) / 'runtime'; root.mkdir()
+            qq_bot.write(root / 'local.json', {'id': 'test', 'local_port': 18080})
+            adapter = {'command': '/node', 'args': ['/adapter.js'], 'env': {'PATH': '/bin'}}
+            qq_bot.write(root / 'data/data/Machine/settings.json',
+                {'acp.agents': {'Codex (local ACP)': adapter, 'Claude (local ACP)': adapter}})
+            legacy_entry = {'command': '/python', 'args': ['/proxy.py', '--root', str(root), '--', '/node', '/adapter.js'],
+                            'env': {'PATH': '/bin'}}
+            qq_bot.write(root / 'qq/entry.json', legacy_entry)
+            legacy_skill = {'path': str(Path(folder) / 'old-skill'), 'sha256': 'deadbeef'}
+            qq_bot.write(root / 'qq/skill.json', legacy_skill)
+            skills = [Path(folder) / 's1', Path(folder) / 's2']
+            with patch('agents.find_node', return_value='/node'), \
+                 patch.object(qq_bot, 'skill_directories', return_value=skills):
+                qq_bot.install(root, no_service=True)
+            self.assertFalse((root / 'qq/entry.json').exists())
+            self.assertFalse((root / 'qq/skill.json').exists())
+            entries = qq_bot.read(root / 'qq/entries.json')
+            self.assertIn('Codex (QQ approvals)', entries)
+            self.assertIn('Claude (QQ approvals)', entries)
+            self.assertEqual(len(qq_bot.read(root / 'qq/skills.json')), 2)
 
     def test_secret_input_refuses_noninteractive_terminal(self):
         with patch.object(sys.stdin, 'isatty', return_value=False):

@@ -112,6 +112,15 @@ export class QQApi {
     this.uploadDiagnostic.stage = 'sent';
     return sent;
   }
+  async markdown(user, content, keyboard, msgId) {
+    const body = {msg_type: 2, markdown: {content}};
+    if (keyboard) body.keyboard = keyboard;
+    if (msgId) { body.msg_id = msgId; body.msg_seq = 1; }
+    return this.call(`/v2/users/${encodeURIComponent(user)}/messages`, body);
+  }
+  async interactionAck(interactionId, code = 0) {
+    return this.call(`/interactions/${encodeURIComponent(interactionId)}`, {code}, 'PUT');
+  }
 }
 
 export class Bridge {
@@ -137,7 +146,7 @@ export class Bridge {
     pairing_active: !!this.pairing && this.clock() < this.pairing.expires,
     pairing_seconds_left: this.pairing ? Math.max(0, Math.ceil((this.pairing.expires - this.clock()) / 1000)) : 0}; }
   received(type) {
-    const known = ['READY', 'RESUMED', 'C2C_MESSAGE_CREATE', 'GROUP_AT_MESSAGE_CREATE',
+    const known = ['READY', 'RESUMED', 'C2C_MESSAGE_CREATE', 'INTERACTION_CREATE', 'GROUP_AT_MESSAGE_CREATE',
       'GROUP_MESSAGE_CREATE', 'DIRECT_MESSAGE_CREATE', 'FRIEND_ADD', 'C2C_MSG_RECEIVE'];
     const name = known.includes(type) ? type : 'OTHER';
     this.eventCounts[name] = (this.eventCounts[name] || 0) + 1;
@@ -155,6 +164,28 @@ export class Bridge {
   scrub(text) {
     for (const secret of [this.config?.app_secret, this.api?.token]) if (secret) text = text.split(secret).join('[REDACTED]');
     return text.replace(/((?:api[_-]?key|secret|token|password|authorization)\s*[=:]\s*)(?:"[^"]*"|'[^']*'|[^\s,}]+)/gi, '$1[REDACTED]');
+  }
+  approvalKeyboard(id) {
+    const callback = (key, label, visited, style, tips) => ({id: key,
+      render_data: {label, visited_label: visited, style},
+      action: {type: 1, permission: {type: 2}, data: key, unsupport_tips: tips}});
+    const rows = [{buttons: [
+      callback(`approve:${id}`, '同意一次', '已同意', 1, '请回复 同意 审批码'),
+      callback(`reject:${id}`, '拒绝一次', '已拒绝', 3, '请回复 拒绝 审批码'),
+    ]}];
+    return {content: {rows}};
+  }
+  async notifyApproval(p, title, details) {
+    const lines = [`# RemoteCode · ${this.local.id}`, '',
+      `**审批码** ${p.id}`, '',
+      `**标题** ${title}`, '',
+      `**会话** ${p.session}`, '',
+      '**详情**', details, '',
+      '点击下方按钮，或 5 分钟内回复：',
+      `- 同意 ${p.id} / 拒绝 ${p.id}`,
+      `- 查看截图 ${p.id}`, '',
+      '仅允许一次；信息不足时请拒绝并在 IDE 中核实。'];
+    await this.api.markdown(this.binding.user_openid, lines.join('\n'), this.approvalKeyboard(p.id));
   }
   async register(body) {
     this.clean();
@@ -174,15 +205,26 @@ export class Bridge {
     const details = this.scrub(JSON.stringify(params.toolCall.rawInput ?? params.toolCall.content ?? '').slice(0, 1800));
     const title = this.scrub(String(params.toolCall.title || '操作审批').slice(0, 300));
     try {
-      await this.api.text(this.binding.user_openid, `RemoteCode · ${this.local.id}\n审批 ${id}\n会话 ${p.session}\n${title}\n${details}\n5 分钟内回复：同意 ${id} / 拒绝 ${id}\n查看截图 ${id}\n仅允许一次；操作详情不完整时请拒绝并回 IDE 查看。`);
+      await this.notifyApproval(p, title, details);
       p.delivering = false; p.lease = this.clock();
       this.audit('approval_sent', id);
       return {route: 'qq', id};
     } catch (e) {
-      // Delivery may have succeeded despite a timeout: invalidate before falling back.
-      p.result = cancelled(); this.lastError = failure(e); this.audit('approval_send_failed', id);
-      p.delivering = false;
-      return {route: 'ide'};
+      // Markdown/keyboard may be rejected or unsupported (e.g. sandbox): retry as plain text.
+      try {
+        const lines = [`RemoteCode · ${this.local.id}`, `审批码 ${id}`, `标题 ${title}`, `会话 ${p.session}`, `详情 ${details}`,
+          '', '5 分钟内回复：', '1 同意一次', '2 拒绝一次', `或 同意 ${id} / 拒绝 ${id}`, `查看截图 ${id}`,
+          '仅允许一次；信息不足时请拒绝并回 IDE 核实。'];
+        await this.api.text(this.binding.user_openid, lines.join('\n'));
+        p.delivering = false; p.lease = this.clock();
+        this.audit('approval_sent', id);
+        return {route: 'qq', id};
+      } catch (e2) {
+        // Delivery may have succeeded despite a timeout: invalidate before falling back to the IDE.
+        p.result = cancelled(); this.lastError = failure(e2); this.audit('approval_send_failed', id);
+        p.delivering = false;
+        return {route: 'ide'};
+      }
     }
   }
   poll(body) {
@@ -197,6 +239,52 @@ export class Bridge {
     }
     return {ok: true};
   }
+  approvalOption(p, kind) {
+    return p.options.find(o => o.kind === kind) || null;
+  }
+  decideApproval(command) {
+    const explicit = /^(同意|拒绝)[\s:：]*([A-F0-9]{12})$/i.exec(command);
+    if (explicit) {
+      const p = this.pending.get(explicit[2].toUpperCase());
+      if (!p || p.result) return {handled: true};
+      return {p, kind: explicit[1] === '同意' ? 'allow_once' : 'reject_once'};
+    }
+    const kind = command === '1' ? 'allow_once' : command === '2' ? 'reject_once'
+      : command === '同意' ? 'allow_once' : command === '拒绝' ? 'reject_once' : null;
+    if (!kind) return null;
+    const pending = [...this.pending.values()].filter(p => !p.result);
+    if (!pending.length) return {hint: 'none'};
+    if (pending.length > 1) return {hint: 'many'};
+    return {p: pending[0], kind};
+  }
+  async interaction(event) {
+    this.clean();
+    const interactionId = String(event.id || '');
+    const ack = async code => {
+      if (!interactionId) return;
+      try { await this.api.interactionAck(interactionId, code); }
+      catch (e) { this.lastError = failure(e); }
+    };
+    // Only inline-keyboard callbacks (type 11) require an ack; quick-menu etc. carry no button data.
+    if (event.type !== 11) { await ack(0); return; }
+    const user = event.user_openid;
+    if (!this.binding.user_openid || user !== this.binding.user_openid) { await ack(4); return; }
+    const buttonData = String(event.data?.resolved?.button_data || '');
+    const match = /^(approve|reject):([A-F0-9]{12})$/i.exec(buttonData);
+    if (!match) { await ack(0); return; }
+    const p = this.pending.get(match[2].toUpperCase());
+    if (!p || p.result) { await ack(3); return; }
+    const kind = match[1].toLowerCase() === 'approve' ? 'allow_once' : 'reject_once';
+    const option = this.approvalOption(p, kind);
+    const verb = kind === 'allow_once' ? '同意' : '拒绝';
+    p.result = option ? {outcome: {outcome: 'selected', optionId: option.optionId}} : cancelled();
+    this.ownerLastSeen = this.clock();
+    this.audit(option ? 'approval_decided' : 'approval_cancelled', p.id);
+    await ack(0);
+    try {
+      await this.api.text(user, `审批 ${p.id}：${option ? verb + '一次的决定已记录，等待 ACP 领取。' : '原请求没有对应选项，已取消。'}执行结果请以 IDE 为准。`);
+    } catch (e) { this.lastError = failure(e); }
+  }
   async picture(body) {
     this.clean();
     if (!this.online || !this.binding.user_openid) fail('BOT_NOT_READY');
@@ -210,7 +298,6 @@ export class Bridge {
       expires: this.clock() + 86400000};
     this.images.set(id, image);
     await this.api.image(this.binding.user_openid, bytes, image.name);
-    await this.api.text(this.binding.user_openid, `RemoteCode · ${this.local.id}\n截图 ${id}${image.session ? '\n会话 ' + image.session : ''}\n回复：查看截图 ${id}`);
     this.audit('image_sent', id);
     return {id, sent: true};
   }
@@ -225,11 +312,11 @@ export class Bridge {
     if (this.seen.has(key)) {this.lastMessage.result = 'duplicate'; return;}
     this.seen.set(key, this.clock());
     const text = String(event.content || '').trim();
-    const bindingText = pairingCommand(event.content);
+    const command = pairingCommand(event.content);
     this.lastMessage.content_kind = typeof event.content;
     this.lastMessage.text_length = text.length;
-    this.lastMessage.has_binding_word = bindingText.includes('绑定');
-    const pairAttempt = /^(?:绑定[\s:：]*)?([A-F0-9]{12})$/i.exec(bindingText);
+    this.lastMessage.has_binding_word = command.includes('绑定');
+    const pairAttempt = /^(?:绑定[\s:：]*)?([A-F0-9]{12})$/i.exec(command);
     if (this.pairing && this.clock() < this.pairing.expires && pairAttempt?.[1].toUpperCase() === this.pairing.code) {
       for (const p of this.pending.values()) p.result = cancelled();
       this.images.clear();
@@ -247,24 +334,27 @@ export class Bridge {
       atomic(path.join(this.dir, 'binding.json'), this.binding); return;
     }
     if (user !== this.binding.user_openid) {
-      this.lastMessage.result = (pairAttempt || bindingText.startsWith('绑定')) ?
+      this.lastMessage.result = (pairAttempt || command.startsWith('绑定')) ?
         (!this.pairing ? 'pair_not_started' : this.clock() >= this.pairing.expires ? 'pair_expired' :
           !pairAttempt ? 'pair_format_invalid' : 'pair_code_mismatch') : 'unbound_sender';
       this.audit(this.lastMessage.result); return;
     }
     this.lastMessage.result = 'bound_user_command';
     this.ownerLastSeen = this.clock();
-    const approval = /^(同意|拒绝)\s+([A-F0-9]{12})$/i.exec(text);
-    if (approval) {
-      const p = this.pending.get(approval[2].toUpperCase());
-      if (!p || p.result) { await this.api.text(user, '审批已处理、已取消或已过期。', event.id); return; }
-      const option = p.options.find(o => o.kind === (approval[1] === '同意' ? 'allow_once' : 'reject_once'));
+    const decision = this.decideApproval(command);
+    if (decision) {
+      if (decision.handled) { await this.api.text(user, '审批已处理、已取消或已过期。', event.id); return; }
+      if (decision.hint === 'none') { await this.api.text(user, '当前没有待审批请求。', event.id); return; }
+      if (decision.hint === 'many') { await this.api.text(user, '有多条待审批请求，请回复“同意 审批码”或“拒绝 审批码”指定。', event.id); return; }
+      const p = decision.p;
+      const option = this.approvalOption(p, decision.kind);
+      const verb = decision.kind === 'allow_once' ? '同意' : '拒绝';
       p.result = option ? {outcome: {outcome: 'selected', optionId: option.optionId}} : cancelled();
       this.audit(option ? 'approval_decided' : 'approval_cancelled', p.id);
-      await this.api.text(user, `审批 ${p.id}：${option ? approval[1] + '一次的决定已记录，等待 ACP 领取。' : '原请求没有对应选项，已取消。'}执行结果请以 IDE 为准。`, event.id);
+      await this.api.text(user, `审批 ${p.id}：${option ? verb + '一次的决定已记录，等待 ACP 领取。' : '原请求没有对应选项，已取消。'}执行结果请以 IDE 为准。`, event.id);
       return;
     }
-    const screenshot = /^查看截图(?:\s+([A-F0-9]{12}))?$/i.exec(text);
+    const screenshot = /^查看截图(?:\s+([A-F0-9]{12}))?$/i.exec(command);
     if (screenshot) {
       let image;
       if (screenshot[1]) {
@@ -275,10 +365,10 @@ export class Bridge {
       else await this.api.text(user, '没有可用截图。需先由截图 skill 推送；此指令不会自动截取桌面。', event.id);
       return;
     }
-    if (text === '状态') {
+    if (command === '状态') {
       await this.api.text(user, `${this.local.id} 在线；待审批 ${this.status().pending} 项。`, event.id); return;
     }
-    await this.api.text(user, '指令：同意 编号 / 拒绝 编号 / 查看截图 [编号] / 状态。仅支持原请求的一次性审批。', event.id);
+    await this.api.text(user, '指令：1 同意一次 / 2 拒绝一次 / 同意 审批码 / 拒绝 审批码 / 查看截图 [编号] / 状态。单条待审批时可直接回复 1/2 或 同意/拒绝。', event.id);
   }
 }
 
@@ -345,7 +435,7 @@ export async function gateway(bridge, stopping) {
         if (packet.op === 10) {
           const interval = Math.max(1000, Number(packet.d?.heartbeat_interval) || 45000);
           ws.send(JSON.stringify(session ? {op: 6, d: {token: `QQBot ${token}`, session_id: session, seq: sequence}} :
-            {op: 2, d: {token: `QQBot ${token}`, intents: 1 << 25, shard: [0, 1], properties: {}}}));
+            {op: 2, d: {token: `QQBot ${token}`, intents: (1 << 25) | (1 << 26), shard: [0, 1], properties: {}}}));
           heartbeat = setInterval(() => {
             if (!ack || stopping.value) { ws.close(); return; }
             ack = false; ws.send(JSON.stringify({op: 1, d: sequence}));
@@ -360,6 +450,7 @@ export async function gateway(bridge, stopping) {
           // Serial handling preserves dispatch order; commit resume sequence only after handling.
           serial = serial.then(async () => {
             if (packet.t === 'C2C_MESSAGE_CREATE') await bridge.message(packet.d);
+            if (packet.t === 'INTERACTION_CREATE') await bridge.interaction(packet.d);
             if (packet.s !== undefined) sequence = packet.s;
           }).catch(e => {bridge.lastError = failure(e);});
         }

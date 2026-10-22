@@ -21,3 +21,4 @@ node_modules/
 .vscode/
 .bootstrap/
 qq/
+.claude/settings.local.json

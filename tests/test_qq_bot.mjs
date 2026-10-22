@@ -14,7 +14,9 @@ function fixture(t) {
   atomic(path.join(root, 'qq/config.json'), {app_id: '12345678', app_secret: 'TEST_SECRET'});
   atomic(path.join(root, 'qq/binding.json'), {user_openid: 'owner'});
   const sent = []; const api = {text: async (...args) => {sent.push(['text', ...args]);},
-    image: async (...args) => {sent.push(['image', ...args]);}};
+    image: async (...args) => {sent.push(['image', ...args]);},
+    markdown: async (...args) => {sent.push(['markdown', ...args]);},
+    interactionAck: async (...args) => {sent.push(['interactionAck', ...args]);}};
   let now = Date.now();
   const bridge = new Bridge(root, api, () => now); bridge.online = true;
   t.after(() => fs.rmSync(root, {recursive: true, force: true}));
@@ -64,11 +66,49 @@ test('no permanent grants or free-form approval, and refusal selects supplied op
   await bridge.message(event('同意 ' + next.id, 'second'));
   assert.equal(bridge.pending.get(next.id).result.outcome.outcome, 'cancelled');
 });
+test('shortcut 1/2 and bare 同意/拒绝 decide exactly one pending approval', async t => {
+  for (const [command, optionId] of [['1', 'YES'], ['2', 'NO'], ['同意', 'YES'], ['拒绝', 'NO']]) {
+    await t.test(command, async t => {
+      const {bridge, body} = fixture(t);
+      const {id} = await bridge.register(body);
+      await bridge.message(event(command));
+      assert.deepEqual(bridge.pending.get(id).result, {outcome: {outcome: 'selected', optionId}});
+    });
+  }
+});
+test('shortcuts refuse to act on zero or multiple pending approvals; explicit code stays precise', async t => {
+  const {bridge, body, sent} = fixture(t);
+  await bridge.message(event('1', 'm1'));
+  assert.match(sent.at(-1)[2], /没有待审批/);
+  const first = await bridge.register(body);
+  const second = await bridge.register({...body, connection: 'connection2', request_key: '22'});
+  await bridge.message(event('1', 'm2'));
+  assert.match(sent.at(-1)[2], /多条待审批/);
+  await bridge.message(event('同意', 'm3'));
+  assert.equal(bridge.pending.get(first.id).result, null);
+  assert.equal(bridge.pending.get(second.id).result, null);
+  await bridge.message(event('同意 ' + first.id, 'm4'));
+  assert.equal(bridge.pending.get(first.id).result.outcome.optionId, 'YES');
+  assert.equal(bridge.pending.get(second.id).result, null);
+});
+test('approval accepts colon and full-width normalization', async t => {
+  const formats = [id => `同意：${id}`, id => `同意:${id}`, id => `同意${id}`, id => `同意　${id.toLowerCase()}`];
+  for (const format of formats) {
+    await t.test(format('CODE'), async t => {
+      const {bridge, body} = fixture(t);
+      const {id} = await bridge.register(body);
+      await bridge.message(event(format(id)));
+      assert.equal(bridge.pending.get(id).result.outcome.optionId, 'YES');
+    });
+  }
+});
 test('offline/unbound uses IDE; uncertain delivery invalidates remote approval', async t => {
   const {bridge, body, api} = fixture(t);
   bridge.online = false; assert.equal((await bridge.register(body)).route, 'ide');
   bridge.online = true; bridge.binding = {}; assert.equal((await bridge.register(body)).route, 'ide');
-  bridge.binding = {user_openid: 'owner'}; api.text = async () => {throw new Error('SECRET_URL');};
+  bridge.binding = {user_openid: 'owner'};
+  api.markdown = async () => {throw new Error('SECRET_URL');};
+  api.text = async () => {throw new Error('SECRET_URL');};
   assert.equal((await bridge.register(body)).route, 'ide');
   assert.equal([...bridge.pending.values()][0].result.outcome.outcome, 'cancelled');
   assert.equal(bridge.lastError.includes('SECRET_URL'), false);
@@ -82,7 +122,7 @@ test('registration retries are idempotent and IDs differ for independent request
 });
 test('slow notification delivery does not expire a proxy before it can poll', async t => {
   const {bridge, body, api, advance} = fixture(t);
-  api.text = async () => {advance(20000); bridge.clean();};
+  api.markdown = async () => {advance(20000); bridge.clean();};
   const result = await bridge.register(body);
   assert.equal(result.route, 'qq');
   assert.equal(bridge.poll({id: result.id, connection: body.connection}).result, null);
@@ -158,6 +198,62 @@ test('image delivery/retrieval associates session and expires; arbitrary data re
   await assert.rejects(bridge.picture({data: Buffer.from('not an image').toString('base64')}));
   advance(86400001); await bridge.message(event('查看截图 ' + image.id, 'expired-picture'));
   assert.equal(sent.at(-1)[0], 'text'); assert.match(sent.at(-1)[2], /没有可用截图/);
+});
+test('approval sends structured markdown with tap buttons and no link; text fallback has no link', async t => {
+  const {bridge, body, sent} = fixture(t);
+  bridge.local.url = 'https://1.2.3.4/m/mac1/';
+  const {id} = await bridge.register(body);
+  const [kind, user, content, keyboard] = sent.at(-1);
+  assert.equal(kind, 'markdown'); assert.equal(user, 'owner');
+  assert.equal(content.startsWith('# RemoteCode · mac1'), true);
+  assert.ok(content.includes(`**审批码** ${id}`));
+  assert.ok(content.includes('**标题** Run test'));
+  assert.ok(content.includes('**会话** session1'));
+  assert.ok(content.includes('**详情**'));
+  assert.ok(content.includes(`- 同意 ${id} / 拒绝 ${id}`));
+  assert.equal(content.includes('https://1.2.3.4'), false);
+  assert.equal(keyboard.content.rows.length, 1);
+  assert.deepEqual(keyboard.content.rows[0].buttons.map(b => b.action.data), [`approve:${id}`, `reject:${id}`]);
+  const {bridge: b2, body: body2, sent: sent2, api: api2} = fixture(t);
+  b2.local.url = 'https://1.2.3.4/m/mac1/';
+  api2.markdown = async () => {throw new Error('UNSUPPORTED');};
+  assert.equal((await b2.register(body2)).route, 'qq');
+  assert.equal(sent2.at(-1)[0], 'text');
+  assert.equal(sent2.at(-1)[2].includes('https://1.2.3.4'), false);
+});
+test('image delivery sends only the image, with no trailing text or link', async t => {
+  const {bridge, sent} = fixture(t);
+  bridge.local.url = 'https://1.2.3.4/m/mac1/';
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aGxkAAAAASUVORK5CYII=', 'base64');
+  const image = await bridge.picture({data: png.toString('base64'), session: 'session1'});
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0][0], 'image');
+  assert.equal(sent[0][3], `${image.id}.png`);
+});
+test('keyboard button callbacks decide the matching approval and ack the interaction', async t => {
+  const {bridge, body, sent} = fixture(t);
+  const {id} = await bridge.register(body);
+  await bridge.interaction({id: 'i1', type: 11, user_openid: 'owner', data: {resolved: {button_data: `approve:${id}`}}});
+  assert.equal(bridge.pending.get(id).result.outcome.optionId, 'YES');
+  assert.deepEqual(sent.find(s => s[0] === 'interactionAck').slice(1), ['i1', 0]);
+  assert.match(sent.at(-1)[2], /决定已记录/);
+  const {id: id2} = await bridge.register({...body, connection: 'connection2', request_key: '22'});
+  await bridge.interaction({id: 'i2', type: 11, user_openid: 'owner', data: {resolved: {button_data: `reject:${id2}`}}});
+  assert.equal(bridge.pending.get(id2).result.outcome.optionId, 'NO');
+});
+test('keyboard callbacks refuse unbound users, malformed data and duplicates', async t => {
+  const {bridge, body, sent} = fixture(t);
+  const {id} = await bridge.register(body);
+  await bridge.interaction({id: 'i3', type: 11, user_openid: 'stranger', data: {resolved: {button_data: `approve:${id}`}}});
+  assert.equal(bridge.pending.get(id).result, null);
+  assert.deepEqual(sent.find(s => s[0] === 'interactionAck' && s[1] === 'i3').slice(1), ['i3', 4]);
+  await bridge.interaction({id: 'i4', type: 11, user_openid: 'owner', data: {resolved: {button_data: 'garbage'}}});
+  assert.equal(bridge.pending.get(id).result, null);
+  assert.deepEqual(sent.find(s => s[0] === 'interactionAck' && s[1] === 'i4').slice(1), ['i4', 0]);
+  await bridge.interaction({id: 'i5', type: 11, user_openid: 'owner', data: {resolved: {button_data: `approve:${id}`}}});
+  assert.equal(bridge.pending.get(id).result.outcome.optionId, 'YES');
+  await bridge.interaction({id: 'i6', type: 11, user_openid: 'owner', data: {resolved: {button_data: `approve:${id}`}}});
+  assert.deepEqual(sent.find(s => s[0] === 'interactionAck' && s[1] === 'i6').slice(1), ['i6', 3]);
 });
 test('loopback API authenticates, denies browser origins, invalidates on unbind', async t => {
   const {bridge} = fixture(t); const server = await startLocal(bridge, 'TEST_LOCAL_TOKEN');
@@ -242,7 +338,7 @@ test('gateway identifies C2C intent and dispatches messages after READY', async 
   }
   globalThis.WebSocket = FakeSocket;
   try {await gateway(bridge, stopping);} finally {globalThis.WebSocket = NativeSocket;}
-  assert.equal(frames[0].op, 2); assert.equal(frames[0].d.intents, 1 << 25);
+  assert.equal(frames[0].op, 2); assert.equal(frames[0].d.intents, (1 << 25) | (1 << 26));
   assert.equal(frames[0].d.token, 'QQBot TEST_TOKEN');
   assert.match(sent.at(-1)[2], /在线/); assert.equal(bridge.online, false);
 });

@@ -32,7 +32,7 @@ ACP 适配器与终端 CLI 是两个入口，适配器内部不保证调用另�
 
 ### 可选 QQ 审批与截图
 
-选择 **Codex (QQ approvals)** 后，链路为 `ACP Client → acp_qq_proxy.py → 原 Codex ACP adapter`。代理透传普通 ACP 消息，只将 `session/request_permission` 交给家庭端 QQ Bot 的受认证回环 HTTP 接口。Bot 主动连接 QQ WebSocket / HTTPS，将绑定用户的一次性选择交回同一个 ACP 请求，不另建模型会话。
+选择 **Codex (QQ approvals)** 或 **Claude (QQ approvals)** 后，链路为 `ACP Client → acp_qq_proxy.py → 原 Codex/Claude ACP adapter`。代理透传普通 ACP 消息，只将 `session/request_permission` 交给家庭端 QQ Bot 的受认证回环 HTTP 接口。Bot 主动连接 QQ WebSocket / HTTPS，将绑定用户的一次性选择交回同一个 ACP 请求，不另建模型会话。
 
 尚未进入 QQ 通道时，服务不可用、未绑定或推送失败会回到 IDE；进入 QQ 通道后超时、失联或会话取消会取消请求。截图由获授权的本机调用上传至 QQ，不自动截取桌面。此链路不经过云端网关；配置、绑定和限制见 [QQ Bot 文档](qq-bot.md)。
 

@@ -25,9 +25,31 @@ from common import read, require, write
 
 SOURCE = Path(__file__).resolve().parent
 
+QQ_AGENTS = (('Codex (local ACP)', 'Codex (QQ approvals)'), ('Claude (local ACP)', 'Claude (QQ approvals)'))
 
-def skill_directory():
-    return Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))) / 'skills/remotecode-qq'
+
+def skill_directories():
+    codex = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))) / 'skills/remotecode-qq'
+    claude = Path(os.environ.get('CLAUDE_CONFIG_DIR', str(Path.home() / '.claude'))) / 'skills/remotecode-qq'
+    return [codex, claude]
+
+
+def managed_entries(directory):
+    manifest = directory / 'entries.json'
+    if manifest.exists():
+        value = read(manifest)
+        return value if isinstance(value, dict) else {}
+    legacy = directory / 'entry.json'
+    return {'Codex (QQ approvals)': read(legacy)} if legacy.exists() else {}
+
+
+def managed_skills(directory):
+    manifest = directory / 'skills.json'
+    if manifest.exists():
+        value = read(manifest)
+        return value if isinstance(value, list) else []
+    legacy = directory / 'skill.json'
+    return [read(legacy)] if legacy.exists() else []
 
 
 def local_call(root, route, body=None, timeout=45):
@@ -265,42 +287,50 @@ def install(root, no_service=False):
             write(directory / 'local-token', secrets.token_urlsafe(32) + '\n')
         write(directory / 'deployment.json', {'schema': 1, 'python': sys.executable,
               'command': [str(Path(node).absolute()), str(runtime / 'qq-bot.mjs'), str(root)]})
-        # Install a self-contained user skill. Only replace our previous managed copy.
-        home_skill = skill_directory()
+        # Install a self-contained user skill into the Codex and Claude skill directories.
+        # Only replace our previous managed copies.
         template = SOURCE.parent / 'skills/remotecode-qq/SKILL.md'
-        manifest = directory / 'skill.json'
-        previous = read(manifest) if manifest.exists() else {}
-        if home_skill.exists():
-            existing = home_skill / 'SKILL.md'
-            require(existing.is_file() and previous.get('sha256') == hashlib.sha256(existing.read_bytes()).hexdigest(),
-                    '已有 remotecode-qq skill 并非当前部署管理或已被修改，拒绝覆盖')
         text = template.read_text().replace('@PYTHON@', sys.executable).replace('@SCRIPT@', str(runtime / 'qq_bot.py')).replace('@ROOT@', str(root))
-        write(home_skill / 'SKILL.md', text)
-        write(manifest, {'path': str(home_skill), 'sha256': hashlib.sha256(text.encode()).hexdigest()})
-        # Add a dedicated entry; retain the original Codex/Claude settings for IDE-only sessions.
+        previous_skills = managed_skills(directory)
+        manifests = []
+        for home_skill in skill_directories():
+            previous = next((m for m in previous_skills if m.get('path') == str(home_skill)), {})
+            if home_skill.exists():
+                existing = home_skill / 'SKILL.md'
+                require(existing.is_file() and previous.get('sha256') == hashlib.sha256(existing.read_bytes()).hexdigest(),
+                        '已有 remotecode-qq skill 并非当前部署管理或已被修改，拒绝覆盖')
+            write(home_skill / 'SKILL.md', text)
+            manifests.append({'path': str(home_skill), 'sha256': hashlib.sha256(text.encode()).hexdigest()})
+        write(directory / 'skills.json', manifests)
+        (directory / 'skill.json').unlink(missing_ok=True)
+        # Add dedicated QQ entries; retain the original Codex/Claude settings for IDE-only sessions.
         from setup import parse_jsonc
         settings = root / 'data/data/Machine/settings.json'
         current = parse_jsonc(settings.read_text()) if settings.exists() else {}
         agents = current.setdefault('acp.agents', {})
-        base = agents.get('Codex (local ACP)')
-        require(base and isinstance(base.get('args', []), list), '找不到 Codex (local ACP)，请先安装本机 agents')
-        label = 'Codex (QQ approvals)'
-        entry = {'command': sys.executable,
-                 'args': [str(runtime / 'acp_qq_proxy.py'), '--root', str(root), '--', base['command'], *base.get('args', [])],
-                 'env': base.get('env', {})}
-        old_entry = read(directory / 'entry.json') if (directory / 'entry.json').exists() else None
-        require(label not in agents or agents[label] in (entry, old_entry), '同名 QQ agent 已被自定义，拒绝覆盖')
+        old_entries = managed_entries(directory)
+        entries = {}
+        for base_label, label in QQ_AGENTS:
+            base = agents.get(base_label)
+            require(base and isinstance(base.get('args', []), list), f'找不到 {base_label}，请先安装本机 agents')
+            entry = {'command': sys.executable,
+                     'args': [str(runtime / 'acp_qq_proxy.py'), '--root', str(root), '--', base['command'], *base.get('args', [])],
+                     'env': base.get('env', {})}
+            old_entry = old_entries.get(label)
+            require(label not in agents or agents[label] in (entry, old_entry), '同名 QQ agent 已被自定义，拒绝覆盖')
+            agents[label] = entry
+            entries[label] = entry
         if settings.exists() and not (directory / 'settings-before.json').exists():
             write(directory / 'settings-before.json', settings.read_text())
-        agents[label] = entry
         # Auto-approve in the client cannot skip permissions intercepted by this proxy.
         current['acp.logTraffic'] = False
         write(settings, current)
-        write(directory / 'entry.json', entry)
+        write(directory / 'entries.json', entries)
+        (directory / 'entry.json').unlink(missing_ok=True)
     if not no_service:
         service(root, 'restart')
         wait_service(root)
-    print('本机 QQ 组件和截图 skill 已部署。ACP 中选择 Codex (QQ approvals)；原有会话需重新连接。')
+    print('本机 QQ 组件和截图 skill 已部署。ACP 中选择 Codex (QQ approvals) 或 Claude (QQ approvals)；原有会话需重新连接。')
 
 
 def pair(root, wait=True):
@@ -366,14 +396,19 @@ def uninstall(root):
     settings = root / 'data/data/Machine/settings.json'
     if settings.exists():
         current = parse_jsonc(settings.read_text())
-        if current.get('acp.agents', {}).get('Codex (QQ approvals)') == read(directory / 'entry.json'):
-            current['acp.agents'].pop('Codex (QQ approvals)', None); write(settings, current)
-    manifest = read(directory / 'skill.json')
-    target = Path(manifest['path']) / 'SKILL.md'
-    if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() == manifest['sha256']:
-        target.unlink()
-        if not any(target.parent.iterdir()):
-            target.parent.rmdir()
+        removed = False
+        for label, entry in managed_entries(directory).items():
+            if current.get('acp.agents', {}).get(label) == entry:
+                current['acp.agents'].pop(label, None)
+                removed = True
+        if removed:
+            write(settings, current)
+    for manifest in managed_skills(directory):
+        target = Path(manifest['path']) / 'SKILL.md'
+        if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() == manifest['sha256']:
+            target.unlink()
+            if not any(target.parent.iterdir()):
+                target.parent.rmdir()
     # Explicit component uninstall revokes local credentials and binding.
     shutil.rmtree(directory)
     print('QQ 服务、受管理的 agent/skill、机器人凭据和绑定已删除。')

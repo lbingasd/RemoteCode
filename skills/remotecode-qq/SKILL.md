@@ -15,4 +15,4 @@ Only send images covered by the user's request to the configured recipient. Chec
 
 The local service performs QQ authentication, upload, and binding checks. Never read or display AppSecret, local tokens or binding files. If the service is unavailable, report the failure instead of uploading elsewhere.
 
-ACP approvals are handled by the `Codex (QQ approvals)` proxy, independently of this skill. Do not translate natural language into arbitrary shell execution, generate approval responses, or approve on the user's behalf. QQ decisions only select options from an existing pending request.
+ACP approvals are handled by the QQ approvals ACP proxy（Codex/Claude）, independently of this skill. Do not translate natural language into arbitrary shell execution, generate approval responses, or approve on the user's behalf. QQ decisions only select options from an existing pending request.
