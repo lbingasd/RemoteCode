@@ -80,6 +80,16 @@ bash deploy-local.sh install --bundle ./pc1 --workspace "$HOME/Projects" --accep
 - 中断后原样重跑；已安装运行目录保留版本、密钥、项目和 IDE 数据。需要离线或跳过依赖安装时用 `--offline` / `--skip-deps`（Windows `-Offline` / `-SkipDeps`）。
 - 只想用 IDE、不装 AI 组件时加 `--no-agents --no-extension`。
 
+### 新增第二台家庭电脑
+
+云端部署完成后，用新的机器标识（如 `pc2`）重跑云端安装即可注册新机器并导出配对包，复用已有 frp、CA 与 nginx 镜像：
+
+```bash
+sudo bash deploy-cloud.sh install --ip 203.0.113.10 --machine pc2 --state /opt/remotecode-state --cn
+```
+
+脚本检测到 state 已存在，会跳过初始化，只在“检查/注册设备”阶段调用 `cloud.py add pc2` 并 `up` 应用（已有连接短暂重连）。完成后把新导出的 `/opt/remotecode-state/enrollment/pc2/` 复制到新家庭电脑，再按上一步安装（`--bundle ./pc2`）。撤销某台机器见下文“日常维护”。
+
 ### 3. 登录 AI 并从 iPad 访问
 
 在家庭电脑交互终端按需登录，并查看初次访问链接与密码：
@@ -114,13 +124,13 @@ iPad 步骤：
 | 操作 | 命令 |
 |---|---|
 | 查看状态 | 云 `sudo bash deploy-cloud.sh status --state /opt/remotecode-state`；家庭 `bash deploy-local.sh status`（Windows `-Action Status`） |
-| 新增一台机器 | `python3 scripts/cloud.py --state state/cloud add mac1 && python3 scripts/cloud.py --state state/cloud up`，复制 `enrollment/mac1/` 到新机器安装 |
+| 新增一台机器 | 一键：重跑 `sudo bash deploy-cloud.sh install --machine <新标识> --state ... --cn`；底层：`python3 scripts/cloud.py --state state/cloud add mac1 && python3 scripts/cloud.py --state state/cloud up`，复制 `enrollment/mac1/` 到新机器安装 |
 | 撤销机器 | `python3 scripts/cloud.py --state state/cloud remove pc1 && python3 scripts/cloud.py --state state/cloud up` |
 | 轮换凭据 | `python3 scripts/cloud.py --state state/cloud rotate mac1`，之后安全复制新配对包 |
 | 续期证书 | `python3 scripts/cloud.py --state state/cloud renew-private-cert`；外部证书用 `renew-cert --cert ... --key ...` |
 | 卸载 | 云 `sudo bash deploy-cloud.sh uninstall --state ... --purge`；家庭 `bash deploy-local.sh uninstall --purge`（Windows `-Action Uninstall -Purge`） |
 
-- 卸载默认停用并移除本项目运行项/容器，保留运行目录；加 `--purge`/`-Purge` 才删除专用 state/root。共享的 Python、Node、Git、Docker、软件源、下载缓存、项目及 `.codex`/`.claude` 认证资料均保留。
+- 卸载默认停用并移除本项目运行项/容器，保留运行目录和下载缓存；加 `--purge`/`-Purge` 才删除专用 state/root 与下载缓存（`downloads/`）。共享的 Python、Node、Git、Docker、软件源、项目及 `.codex`/`.claude` 认证资料始终保留。
 - 升级不自动滚动：使用新的 download lock 安装到新目录并重新配对；具体见下方验证范围。个人叶子证书有效期 365 天、CA 十年。
 
 ## 验证范围

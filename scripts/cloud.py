@@ -235,7 +235,7 @@ def main():
     renew.add_argument("--cert", required=True, type=Path)
     renew.add_argument("--key", required=True, type=Path)
     uninstall = subs.add_parser("uninstall")
-    uninstall.add_argument("--purge", action="store_true", help="还会删除此 state 内的密钥与配对资料；保留原证书和下载缓存")
+    uninstall.add_argument("--purge", action="store_true", help="还会删除此 state 内的密钥、配对与证书")
     args = parser.parse_args()
     root = args.state.resolve()
     require(root not in (Path(root.anchor), Path.home(), Path.cwd()), "state 必须是独立子目录")

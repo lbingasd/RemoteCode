@@ -100,7 +100,7 @@ try {
         Write-Host '.\deploy-local.ps1 -Action Install -Bundle .\pc1 -Workspace D:\Projects -AcceptLicense [-CN]'
         Write-Host 'Options: -Root -Cache -Lock -Mirror https://your.mirror/{url} -Registry -Offline -SkipDeps'
         Write-Host '         -NoAgents -NoExtension -NoService -Headless -QQBot -Vsix -VsixSha256 -NssmPath -NssmSha256'
-        Write-Host 'Uninstall: .\deploy-local.ps1 -Action Uninstall [-Purge]; shared dependencies/caches/projects are retained.'
+        Write-Host 'Uninstall: .\deploy-local.ps1 -Action Uninstall [-Purge]; -Purge also removes the download cache.'
         exit 0
     }
     if ($env:OS -ne 'Windows_NT') { throw 'Use deploy-local.sh on macOS/Linux.' }

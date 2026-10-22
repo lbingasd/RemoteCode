@@ -123,6 +123,24 @@ def select_lock(args, target, platform_name, local=False):
     return chosen
 
 
+def purge_cache(args):
+    """uninstall --purge 时删除下载缓存；拒绝触碰非本项目缓存路径。"""
+    cache = args.cache
+    if not cache.exists():
+        return
+    require(cache not in (Path.home(), Path.cwd(), Path(cache.anchor), PACKAGE),
+            "缓存路径不安全，拒绝整目录删除；请确认 --cache 指向本工具的下载缓存目录")
+    known = any(
+        entry.name in ("npm", "python", "nssm") or entry.name.endswith(".lock.json")
+        or (entry.is_file() and entry.name.startswith(("frp_", "vscode-web-")))
+        for entry in cache.iterdir()
+    )
+    require(known or cache == PACKAGE / "downloads",
+            f"缓存目录未发现本项目文件，拒绝整目录删除: {cache}\n请手动清理，或核对 --cache 是否指向正确目录")
+    shutil.rmtree(cache)
+    print(f"已删除下载缓存: {cache}")
+
+
 def cloud_setup(args, root):
     if args.action != "install":
         if not (root / "state.json").exists():
@@ -476,7 +494,7 @@ def home_setup(args, root):
                 script("local-service.py", "remove", "--root", root)
             extra = ["--purge"] if args.purge else []
             script("local.py", "--root", root, "uninstall", *extra)
-            print("共享依赖、下载缓存、项目、.codex/.claude 和厂商登录资料保留。")
+            print("共享依赖、项目、.codex/.claude 与厂商登录资料保留。")
         return
     require(args.accept_license, "请阅读微软 VS Code Server 许可，再添加 --accept-license")
     require(args.bundle and args.workspace, "家庭端 install 需要 --bundle 和 --workspace")
@@ -575,7 +593,7 @@ def parser():
     p.add_argument("--lock", type=Path)
     p.add_argument("--workers", type=int, choices=range(1, 17), default=8)
     p.add_argument("--simple-download", action="store_true", help="不支持 Range 的源使用普通续传模式")
-    p.add_argument("--purge", action="store_true", help="卸载时删除专用 state/root，保留共享依赖和缓存")
+    p.add_argument("--purge", action="store_true", help="卸载时删除专用 state/root 与下载缓存（保留共享依赖、项目和登录资料）")
     p.add_argument("--state", type=Path, default=PACKAGE / "state/cloud")
     p.add_argument("--ip")
     p.add_argument("--machine", type=identifier, default="pc1")
@@ -624,6 +642,11 @@ def main():
             require(os.getuid() != 0, "家庭端请用普通开发用户执行，不要 sudo")
     with deployment_lock(root):
         (cloud_setup if args.role == "cloud" else home_setup)(args, root)
+        if args.action == "uninstall":
+            if args.purge:
+                purge_cache(args)
+            else:
+                print("下载缓存保留；彻底清理请追加 --purge。")
 
 
 if __name__ == "__main__":

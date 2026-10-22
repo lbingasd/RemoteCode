@@ -207,6 +207,23 @@ class SetupTests(unittest.TestCase):
                     function(args, root)
                 self.assertEqual((root / "unrelated.txt").read_text(), "keep")
 
+    def test_purge_cache_deletes_tool_cache_but_refuses_foreign_dir(self):
+        with tempfile.TemporaryDirectory() as folder:
+            cache = Path(folder) / "cache"
+            cache.mkdir()
+            (cache / "frp_0.71.1_linux_amd64.tar.gz").write_bytes(b"x")
+            args = options("local", "uninstall", "--purge", "--cache", str(cache))
+            setup.purge_cache(args)
+            self.assertFalse(cache.exists())
+
+            foreign = Path(folder) / "foreign"
+            foreign.mkdir()
+            (foreign / "notes.txt").write_bytes(b"keep")
+            args = options("local", "uninstall", "--purge", "--cache", str(foreign))
+            with self.assertRaises(ValueError):
+                setup.purge_cache(args)
+            self.assertEqual((foreign / "notes.txt").read_text(), "keep")
+
     def test_launchagents_install_repeat_remove_and_foreign_owner(self):
         with tempfile.TemporaryDirectory() as folder:
             home = Path(folder)
