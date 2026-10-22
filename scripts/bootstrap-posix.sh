@@ -129,7 +129,7 @@ rc_bootstrap() {
         echo "Usage: bash deploy-$role.sh {install|status|uninstall} [options]"
         echo 'Install: --cn --mirror HTTPS/{url} --cache DIR --skip-deps --offline'
         echo 'Cloud: --ip IPv4 --machine pc1 --state DIR --image IMAGE'
-        echo 'Local: --bundle DIR --workspace DIR --accept-license [--no-agents] [--no-service]'
+        echo 'Local: --bundle DIR --workspace DIR --accept-license [--no-agents] [--no-service] [--qq-bot]'
         echo 'Uninstall: [--purge] (shared dependencies and caches are retained)'
         exit 0
     fi

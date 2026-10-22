@@ -10,13 +10,14 @@ PACKAGE = Path(__file__).resolve().parent.parent
 
 
 def build(output):
-    files = [PACKAGE / name for name in ("README.md", ".gitignore", "deploy-cloud.sh", "deploy-local.sh", "deploy-local.ps1")]
-    for folder, suffixes in (("scripts", {".py", ".sh", ".ps1"}), ("tests", {".py", ".ps1"}),
+    files = [PACKAGE / name for name in ("README.md", ".gitignore", "deploy-cloud.sh", "deploy-local.sh", "deploy-local.ps1", "deploy-qq.sh", "deploy-qq.ps1")]
+    for folder, suffixes in (("scripts", {".py", ".sh", ".ps1", ".mjs"}), ("tests", {".py", ".ps1", ".mjs"}),
                              ("examples", {".json"}), ("docs", {".md", ".json", ".png"})):
         files += [path for path in (PACKAGE / folder).rglob("*")
                   if path.is_file() and not path.is_symlink() and path.suffix in suffixes
                   and not any(part.startswith(".") or part == "__pycache__" for part in path.relative_to(PACKAGE / folder).parts)]
     files.append(PACKAGE / "assets/README.md")
+    files.append(PACKAGE / "skills/remotecode-qq/SKILL.md")
     for name in ("nssm.lock.json", "acp-extension.lock.json"):
         item = json.loads((PACKAGE / "examples" / name).read_text())
         asset = PACKAGE / "assets" / item["name"]

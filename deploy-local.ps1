@@ -19,6 +19,7 @@ param(
     [switch]$NoExtension,
     [switch]$NoService,
     [switch]$Headless,
+    [switch]$QQBot,
     [switch]$SimpleDownload,
     [switch]$Purge,
     [string]$Vsix,
@@ -91,7 +92,7 @@ try {
     if ($Help) {
         Write-Host '.\deploy-local.ps1 -Action Install -Bundle .\pc1 -Workspace D:\Projects -AcceptLicense [-CN]'
         Write-Host 'Options: -Root -Cache -Lock -Mirror https://your.mirror/{url} -Registry -Offline -SkipDeps'
-        Write-Host '         -NoAgents -NoExtension -NoService -Headless -Vsix -VsixSha256 -NssmPath -NssmSha256'
+        Write-Host '         -NoAgents -NoExtension -NoService -Headless -QQBot -Vsix -VsixSha256 -NssmPath -NssmSha256'
         Write-Host 'Uninstall: .\deploy-local.ps1 -Action Uninstall [-Purge]; shared dependencies/caches/projects are retained.'
         exit 0
     }
@@ -124,6 +125,7 @@ try {
         '--cn'=$CN; '--skip-deps'=$SkipDeps; '--offline'=$Offline; '--accept-license'=$AcceptLicense
         '--no-agents'=$NoAgents; '--no-extension'=$NoExtension; '--no-service'=$NoService
         '--headless'=$Headless; '--simple-download'=$SimpleDownload; '--purge'=$Purge
+        '--qq-bot'=$QQBot
     }
     foreach ($Key in $Flags.Keys) { if ($Flags[$Key]) { $Arguments += $Key } }
     $Start = New-Object Diagnostics.ProcessStartInfo

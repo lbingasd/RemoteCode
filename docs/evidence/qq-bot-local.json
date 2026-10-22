@@ -1,0 +1,118 @@
+{
+  "date": "2026-10-22",
+  "machine": "mac1",
+  "scope": "local QQ component deployment; no cloud mutations",
+  "targeted_tests": {
+    "qq_node": 13,
+    "qq_python": 9,
+    "setup_python": 16,
+    "total": 38,
+    "status": "PASS"
+  },
+  "runtime_payload_matches_source": true,
+  "real_codex_acp_initialize": {
+    "status": "PASS",
+    "protocolVersion": 1,
+    "authMethodCount": 2
+  },
+  "local_bot_service": "ONLINE_BOUND",
+  "qq_credentials_configured": true,
+  "real_qq_messages": "BINDING_CONFIRMED_BY_USER_AND_LOCAL_STATUS",
+  "real_model_approval": "NOT_TESTED",
+  "screenshots": "existing PNG/JPEG delivery; no desktop capture service",
+  "windows_linux_lifecycle": "NOT_TESTED",
+  "auth_tls_fix": {
+    "date": "2026-10-22",
+    "before": "Python missing OpenSSL CA; SSLCertVerificationError verify code 20",
+    "system_curl": "TLS verification PASS",
+    "fix": "load macOS /etc/ssl/cert.pem; preserve explicit CA overrides and certificate/hostname checks",
+    "after": "Python verified TLS and received QQ business code 100007 with deliberately invalid credentials",
+    "python_targeted_tests": 13,
+    "test_status": "PASS",
+    "real_credentials_used": false,
+    "deployed_runtime_updated": true,
+    "full_regression_run": false
+  },
+  "real_qq_gateway": "READY",
+  "binding_diagnosis": {
+    "date": "2026-10-22",
+    "snapshot_after_diagnostic_restart": {
+      "configured": true,
+      "online": true,
+      "bound": false,
+      "event_counts": {
+        "READY": 1
+      },
+      "last_message": null,
+      "pairing_active": false
+    },
+    "meaning": "Gateway READY does not prove C2C message delivery; waiting for new user pairing attempt",
+    "changes": [
+      "redacted event counts and message outcomes",
+      "case-insensitive pairing code and colon separator",
+      "C2C author OpenID alias compatibility",
+      "local pairing wait diagnostics"
+    ],
+    "node_targeted_tests": 14,
+    "python_targeted_tests": 13,
+    "status": "PASS",
+    "real_c2c_delivery": "NOT_OBSERVED",
+    "full_regression_run": false
+  },
+  "real_c2c_delivery": "OBSERVED",
+  "pair_wait_fix": {
+    "date": "2026-10-22",
+    "reproduced": "C2C_MESSAGE_CREATE count 2; last result unbound_sender; pairing active; CLI omitted output for that branch",
+    "fixes": [
+      "immediate start and unconditional five-second heartbeat",
+      "bounded local status requests",
+      "normalize binding command and accept exact active bare code",
+      "persist unexpired pairing challenge across restart",
+      "report binding persistence separately from QQ reply delivery"
+    ],
+    "node_targeted_tests": 17,
+    "python_targeted_tests": 14,
+    "status": "PASS",
+    "deployed": true,
+    "real_binding": "PASS_USER_CONFIRMED_AND_LOCAL_BOUND_TRUE",
+    "full_regression_run": false
+  },
+  "real_image_upload": {
+    "date": "2026-10-22",
+    "asset": "synthetic QQ TEST PNG; no project data",
+    "size_bytes": 2858,
+    "observed_part_index": 1,
+    "part_index_type": "number",
+    "issue": "previous strict zero-based validation rejected the real response",
+    "fix": "use validated server-returned contiguous 0/1-based indices including numeric strings",
+    "api_send_result": "PASS",
+    "phone_display": "WAITING_FOR_USER_CONFIRMATION",
+    "node_targeted_tests": 18,
+    "full_regression_run": false
+  },
+  "real_qq_approval_smoke": {
+    "date": "2026-10-22",
+    "scope": "real QQ + deployed proxy + simulated ACP adapter; no model task",
+    "push": "PASS_USER_CONFIRMED",
+    "decision": "PASS_REAL_QQ_REPLY_TO_ORIGINAL_REQUEST",
+    "result": {
+      "approval": {
+        "outcome": "selected",
+        "optionId": "smoke-allow-once"
+      },
+      "read_only_test_marker": "QQ_ACP_ROUNDTRIP",
+      "shell_executed": false,
+      "project_changed": false,
+      "model_called": false
+    },
+    "pending_after": 0,
+    "model_acceptance": "NOT_TESTED",
+    "cleanup_fix": "ordinary disconnect cancellation preserves an already decided result"
+  },
+  "latest_targeted_tests": {
+    "node_qq": 18,
+    "scope": "QQ binding, upload schema, gateway mock, local HTTP and stdio proxy",
+    "status": "PASS",
+    "full_regression_run": false
+  }
+}

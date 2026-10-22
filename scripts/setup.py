@@ -464,8 +464,12 @@ def home_setup(args, root):
                 else:
                     script("local-service.py", "status", "--root", root)
             script("local.py", "--root", root, "doctor")
+            if (root / "qq/deployment.json").exists():
+                script("qq_bot.py", "status", "--root", root)
         else:
             # Always remove managed services on uninstall, regardless of --no-service.
+            if (root / "qq/deployment.json").exists():
+                script("qq_bot.py", "uninstall", "--root", root)
             if os.name == "nt":
                 windows_service(root, "Remove", args)
             else:
@@ -521,6 +525,10 @@ def home_setup(args, root):
         merge_settings(root)
     if not args.no_extension:
         install_extension(root, args)
+    if args.qq_bot:
+        require(not args.no_agents, "--qq-bot 需要安装本机 agents")
+        extra = ["--no-service", "--no-configure"] if args.no_service else []
+        script("qq_bot.py", "install", "--root", root, *extra)
     if not args.no_service:
         if os.name == "nt":
             nssm = prepare_nssm(root, args)
@@ -575,6 +583,7 @@ def parser():
     p.add_argument("--no-extension", action="store_true")
     p.add_argument("--no-service", action="store_true")
     p.add_argument("--headless", action="store_true", help="Windows 开机 IDE 任务，需要账号密码/UAC；Mac 仍需登录")
+    p.add_argument("--qq-bot", action="store_true", help="家庭端安装 QQ Bot；交互输入 AppID/AppSecret，无云端改动")
     p.add_argument("--vsix", type=Path)
     p.add_argument("--vsix-sha256")
     p.add_argument("--nssm-path", type=Path)
@@ -588,6 +597,10 @@ def main():
     if args.cn:
         os.environ["REMOTECODE_CN"] = "1"
     require(not args.purge or args.action == "uninstall", "--purge 仅用于 uninstall")
+    require(not args.qq_bot or args.role == "local", "--qq-bot 仅用于家庭端部署")
+    if args.qq_bot and args.action == "install":
+        require(not args.no_agents, "--qq-bot 需要本机 agents，不能同时使用 --no-agents")
+        require(not args.offline, "QQ 配置需要联网；离线安装后再运行 deploy-qq.sh / deploy-qq.ps1")
     if args.mirror:
         require(args.mirror.count("{url}") == 1, "镜像模板须包含一次 {url}")
     args.registry = args.registry or ("https://registry.npmmirror.com" if args.cn else "https://registry.npmjs.org")
