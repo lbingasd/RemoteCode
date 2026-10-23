@@ -28,6 +28,18 @@ class SetupTests(unittest.TestCase):
         guard.start()
         self.addCleanup(guard.stop)
 
+    def test_missing_cli_stops_before_runtime_download(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder) / 'runtime'
+            args = options('local', 'install', '--accept-license', '--bundle', str(Path(folder) / 'bundle'),
+                           '--workspace', str(Path(folder) / 'workspace'))
+            with patch.object(agents, 'find_cli', return_value=None), \
+                 patch.object(setup, 'fetch_item') as fetch:
+                with self.assertRaisesRegex(ValueError, 'codex, claude'):
+                    setup.home_setup(args, root)
+                fetch.assert_not_called()
+            self.assertFalse(root.exists())
+
     def test_private_node_npm_remains_usable_without_shell_path_changes(self):
         with tempfile.TemporaryDirectory() as folder:
             prefix = Path(folder).resolve() / "tools/node"

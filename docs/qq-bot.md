@@ -4,6 +4,10 @@ QQ Bot、截图发送与 ACP 代理运行在家庭主机，复用 Node.js 22 和
 
 ## 安装与输入 QQ 信息
 
+前置条件：同一开发用户的 Codex CLI 和 Claude CLI 已可用，家庭端默认 AI 部署已完成，IDE 设置中存在 `Codex (local ACP)` 与 `Claude (local ACP)`。部署脚本仅安装 ACP 适配器与 QQ 组件，不安装 CLI 或配置模型；缺少 CLI 时家庭端 AI 部署直接报错。
+
+当前支持 Codex 和 Claude 两类 ACP 会话的一次性权限审批与已授权截图发送，分别通过对应的 `QQ approvals` 条目使用。QQ 不提供新建模型会话、发送任意任务或接管独立终端/桌面 App 会话的功能，其他 agent 类型尚未自动接入。模型与服务商沿用本机 CLI 的配置。
+
 已经安装 RemoteCode 的 macOS/Linux，在工具包目录运行：
 
 ```bash

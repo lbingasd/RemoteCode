@@ -26,12 +26,25 @@ flowchart LR
 | 位置 | 前置要求 | 你需要输入/准备 |
 |---|---|---|
 | 云服务器 | Ubuntu 22.04+ / Debian 12+ / RHEL 家族（Rocky、Alma、CentOS Stream 9、Amazon Linux 2023、openEuler 22.03+ 等），x64 或 ARM64；TCP 443 可用 | 公网 IPv4、机器标识（如 `pc1`）、长期 state 目录（建议 `/opt/remotecode-state`） |
-| 家庭电脑 | Windows 10/11、macOS 或 Linux，普通开发账号；项目目录与运行目录分开 | 工作区目录（如 `$HOME/Projects`）；按需先装 Codex CLI / Claude CLI（前置，检测到即用，否则自动装版本锁定副本） |
+| 家庭电脑 | Windows 10/11、macOS 或 Linux，普通开发账号；项目目录与运行目录分开 | 工作区目录（如 `$HOME/Projects`）；默认 AI 部署要求本机 Codex CLI 和 Claude CLI 均已可用 |
 | iPad | Safari；个人 CA 需安装并开启完全信任 | 从云端安全取得 `root-ca.crt`，手动导入描述文件 |
-| AI 账号 | Codex 或 Claude 账号，或经 cc-switch 等切换后的第三方兼容服务 | 在家庭电脑交互终端完成登录，凭据不入库、不外传 |
-| 可选 QQ Bot | 已有家庭运行目录 | QQ 开放平台的 AppID、AppSecret、是否沙箱；用绑定命令绑定接收账号 |
+| 本机 AI 工具 | 同一开发用户可直接运行 `codex` 和 `claude`，已完成各自配置并能执行模型任务 | 确保两个 CLI 在 PATH 中；仅装桌面 App 不等于 CLI 可调用。部署只检查 CLI 能否执行 `--version`，不会安装 CLI、配置模型或处理认证 |
+| 可选 QQ Bot | 已有家庭运行目录、Codex/Claude ACP 条目、Node.js 22+ 和 Python 3.12+ | QQ 开放平台的 AppID、AppSecret、是否沙箱；接收账号具备对应环境的使用权限，并完成单聊绑定 |
 
 依赖会自动补齐：云端检查/安装 curl、CA、OpenSSL、Python 3.12+、Docker Engine 与 Compose 插件；家庭端检查/安装 Python 3.12+、Node.js 22+、Git。不支持自动安装的发行版（openSUSE/SLES、CentOS 7、Amazon Linux 2 等）先预装依赖再加 `--skip-deps`。
+
+Codex CLI 与 Claude CLI 由用户预先准备。检测不到或无法执行时，AI 部署直接报错，不尝试补装。部署安装 ACP 适配器及其 npm 依赖，运行时明确指向已检测到的本机 CLI。仅需远程 IDE 时使用 `-NoAgents -NoExtension` / `--no-agents --no-extension`，可跳过这两个 CLI 的要求。
+
+### 支持的 AI 类型与 QQ 功能
+
+| 类型 | 浏览器 IDE 条目 | QQ 审批条目 | 前置条件 |
+|---|---|---|---|
+| Codex CLI | `Codex (local ACP)` | `Codex (QQ approvals)` | 本机 Codex CLI 可用，通过 `@agentclientprotocol/codex-acp` 适配 |
+| Claude CLI | `Claude (local ACP)` | `Claude (QQ approvals)` | 本机 Claude CLI 可用，通过 `@agentclientprotocol/claude-agent-acp` 适配 |
+
+默认安装同时生成上述两类条目，因此要求两个 CLI 都通过检测；实际使用时可任选其中一类。模型和服务商由本机 CLI 自身配置决定，RemoteCode 不提供模型/服务商配置入口，也不承诺任意兼容服务均可用。
+
+QQ Bot 当前支持这两类 ACP 会话的一次性权限审批和已授权截图发送，须在 IDE 中选择对应的 `QQ approvals` 条目。QQ 不提供新建模型会话或通过聊天提交任意任务的入口，也不接管已有桌面 App、独立终端会话或其他 agent。当前安装器没有其他 AI 类型的自动接入。每台家庭电脑使用独立 QQ Bot AppID。
 
 ## 部署（云 → 家庭电脑 → iPad）
 
@@ -44,8 +57,6 @@ flowchart LR
 | 工具包目录 | `C:\Users\libing\Documents\RemoteCode` | 本仓库，含部署脚本；在此运行命令 |
 | 运行目录 `-Root` | `C:\Users\libing\RemoteCode` | 默认安装位置，保存程序、机器凭据、IDE 数据和日志 |
 | 工作区 `-Workspace` | `C:\Users\libing\Projects` | 你的项目代码；必须显式指定，可用已有目录 |
-
-PowerShell 中 `"$env:USERPROFILE\Projects"` 会展开为当前用户主目录下的 `Projects`，例如 `C:\Users\libing\Projects`。`Projects` 只是示例文件夹名，可以改为 `D:\Projects` 等自己的目录。**不能在使用默认运行目录时，把工作区改成 `"$env:USERPROFILE\remotecode"`**：Windows 路径不区分大小写，会与 `RemoteCode` 运行目录重合。运行目录与工作区不能相同，也不能互相包含。运行目录不要指向仓库、用户主目录或磁盘根目录。
 
 ### 1. 安装云端
 
@@ -100,7 +111,7 @@ macOS / Linux（以当前开发用户执行，不要 sudo）：
 bash deploy-local.sh install --bundle ./pc1 --workspace "$HOME/Projects" --accept-license --cn
 ```
 
-`deploy-local.sh` / `deploy-local.ps1` 依次执行：补齐 Python/Node/Git（Windows 走 WinGet，macOS 走 Homebrew，Linux 同云端依赖范围）→ 下载并校验 VS Code Web Server 与 frpc → 创建运行目录与工作区 → 安装 ACP 适配器并检测前置 Codex/Claude CLI（未检测到才装版本锁定副本）→ 合并远程 IDE 设置、安装 ACP 扩展与 Safari 布局兼容补丁 → 注册系统服务/任务并 `doctor` 健康检查。`-AcceptLicense`/`--accept-license` 表示接受微软 VS Code Server 许可；`--cn`/`-CN` 启用国内镜像，`npm` 走 npmmirror。
+`deploy-local.sh` / `deploy-local.ps1` 依次执行：补齐 Python/Node/Git（Windows 走 WinGet，macOS 走 Homebrew，Linux 同云端依赖范围）→ 检查本机 Codex/Claude CLI（缺失或无法执行则报错）→ 下载并校验 VS Code Web Server 与 frpc → 创建运行目录与工作区 → 安装 ACP 适配器并指向本机 CLI → 合并远程 IDE 设置、安装 ACP 扩展与 Safari 布局兼容补丁 → 注册系统服务/任务并 `doctor` 健康检查。`-AcceptLicense`/`--accept-license` 表示接受微软 VS Code Server 许可；`--cn`/`-CN` 启用国内镜像，`npm` 走 npmmirror。
 
 - 默认运行目录为用户主目录下的 `RemoteCode`，工作区为 `--workspace` 指定目录，二者必须互相独立且不能互相包含。
 - 中断后原样重跑；已安装运行目录保留版本、密钥、项目和 IDE 数据。需要离线或跳过依赖安装时用 `--offline` / `--skip-deps`（Windows `-Offline` / `-SkipDeps`）。
@@ -115,7 +126,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy-local.ps1 -Action S
 python .\scripts\local.py url --show-secrets
 ```
 
-若安装时指定了自定义 `-Root`，后续状态、QQ、登录和卸载命令也要指向同一个目录；底层 Python 脚本的 `--root` 放在子命令前，例如 `python .\scripts\local.py --root D:\RemoteCodeRuntime url --show-secrets`。`Status` 检查服务与本机 IDE/云端 TLS；浏览器访问、AI 登录和模型回复仍需按第 3 步验收。
+若安装时指定了自定义 `-Root`，后续状态、QQ 和卸载命令也要指向同一个目录；底层 Python 脚本的 `--root` 放在子命令前，例如 `python .\scripts\local.py --root D:\RemoteCodeRuntime url --show-secrets`。`Status` 检查服务与本机 IDE/云端 TLS；浏览器访问和模型回复仍需按第 3 步验收。
 
 ### 新增第二台家庭电脑
 
@@ -135,19 +146,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy-local.ps1 -Bundle .
 
 两台电脑各自使用自己的配对包，浏览器分别访问 `https://公网IPv4/m/pc1/` 和 `https://公网IPv4/m/pc2/`，账号密码也按各自配对信息使用。不要把 `pc1` 的包复制给第二台电脑作为新身份。撤销机器见下文“日常维护”。
 
-### 3. 登录 AI 并从 iPad 访问
+### 3. 从 iPad 访问
 
-在家庭电脑交互终端按需登录，并查看初次访问链接与密码：
+在家庭电脑交互终端查看初次访问链接与浏览器密码：
 
 ```bash
-python3 scripts/agents.py exec codex -- login
-python3 scripts/agents.py exec claude
 python3 scripts/local.py url --show-secrets
 ```
 
 Windows 把 `python3` 换成 `python`。凭据只在自己终端查看，不公开转发。
-
-**模型切换（cc-switch 等）**：`cc switch` 这类工具只把配置写回共享目录——Codex 读 `~/.codex/config.toml`（`model`/`model_provider`/`[model_providers.*]` 的 `base_url`/`env_key`/`wire_api`），Claude 读 `~/.claude/settings.json`（`env.ANTHROPIC_BASE_URL`/`ANTHROPIC_AUTH_TOKEN`/模型）。部署检测到前置 CLI 时会把适配器指向它（`CODEX_PATH` / `CLAUDE_CODE_EXECUTABLE`），因此切换会原样生效；未检测到前置 CLI 时使用适配器自带的版本锁定 CLI，同样读取上述共享配置。切换后断开并重连对应 agent、新建会话测试。用 Claude 走 DeepSeek 官方兼容入口时，更新 Key 可在家庭电脑运行 `python3 scripts/update-deepseek-key.py`（隐藏输入，仅更新 `~/.claude/settings.json` 的 `env.ANTHROPIC_AUTH_TOKEN`）。
 
 iPad 步骤：
 
@@ -185,7 +192,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy-qq.ps1 -Action pair
 | 脚本 | 过程与输入 | 副作用 |
 |---|---|---|
 | `deploy-cloud.sh` | 云网关入口。阶段：系统依赖 → 私有 Python → Docker/Compose → `setup.py cloud`（六阶段）。输入：`--ip`（公网 IPv4，必填）、`--machine`、`--state`、`--cn`、`--skip-deps`、`--offline` 等 | 安装/补齐共享系统依赖与 Docker 插件；不改系统源、不替换已有 Docker、不自动停现有服务 |
-| `deploy-local.sh` / `deploy-local.ps1` | 家庭端入口。阶段：依赖 → IDE/frpc → 运行目录 → ACP 适配器 + 前置 CLI 检测 → 远程设置/扩展 → 服务注册 → doctor。输入：`--bundle`、`--workspace`、`--accept-license`、`--cn` 等 | 安装 VS Code Web、frpc、ACP 适配器与扩展；注册服务/任务（Windows frpc 为系统服务）；不触碰 `.codex`/`.claude` 登录资料 |
+| `deploy-local.sh` / `deploy-local.ps1` | 家庭端入口。阶段：依赖 → 前置 CLI 检测 → IDE/frpc → 运行目录 → ACP 适配器 → 远程设置/扩展 → 服务注册 → doctor。输入：`--bundle`、`--workspace`、`--accept-license`、`--cn` 等 | 安装 VS Code Web、frpc、ACP 适配器与扩展；注册服务/任务（Windows frpc 为系统服务）；不触碰 `.codex`/`.claude` 登录资料 |
 | `deploy-qq.sh` / `deploy-qq.ps1` | 对已有家庭运行目录追加 QQ Bot（见 [QQ Bot 文档](docs/qq-bot.md)）。交互输入 AppID/AppSecret/沙箱，验证鉴权后写配置并启动 | 只改家庭端；不修改云端/IDE/frp |
 
 ### 云端参数：`deploy-cloud.sh`
@@ -220,7 +227,7 @@ Windows 语法为 `.\deploy-local.ps1 -Action <Install|Status|Uninstall> [参数
 | `-CN` | `--cn` | 可选；启用国内下载策略，npm 默认切换到 npmmirror |
 | `-SkipDeps` | `--skip-deps` | 跳过系统包管理器，依赖须已就绪；不会禁止联网下载 IDE、适配器等 |
 | `-Offline` | `--offline` | 只使用已有依赖和缓存；需提前准备对应平台的 lock、IDE/frp/NSSM、VSIX 和 npm 缓存；不能同时启用 QQ 安装 |
-| `-NoAgents` | `--no-agents` | 跳过 CLI/ACP 适配器安装与设置合并；不自动跳过扩展，纯 IDE 可同时加 `-NoExtension` |
+| `-NoAgents` | `--no-agents` | 跳过本机 CLI 检测、ACP 适配器安装与设置合并；不自动跳过扩展，纯 IDE 可同时加 `-NoExtension` |
 | `-NoExtension` | `--no-extension` | 跳过 ACP 扩展安装；不自动跳过 agents |
 | `-NoService` | `--no-service` | 安装时不注册/启动 IDE 和 frpc，也不执行安装末尾的 doctor；需自行启动。状态时跳过服务管理器检查；卸载仍会移除已管理服务 |
 | `-Headless` | `--headless` | 仅 Windows IDE 开机任务使用，需要同一开发账号密码与 UAC；切换已有任务模式需先移除旧任务；不代表 macOS/QQ 支持未登录运行 |
@@ -290,6 +297,7 @@ Windows 用 `-Action 动作`（默认 `install`），Bash 用位置参数动作�
 | `Join-Path ... Path ... empty string`，位置在 `$PSScriptRoot` | 更新到当前脚本；默认缓存已改为在参数绑定完成后初始化。旧版临时绕过可显式传 `-Cache "$PWD\downloads"` |
 | 提示工作区/安装目录不能互相包含 | `-Root` 是运行程序目录，`-Workspace` 是项目目录；Windows 的 `RemoteCode` 与 `remotecode` 是同一路径，换成 `Projects` 等独立目录 |
 | `Bundle must contain machine.json...` 或找不到配对文件 | 检查 `-Bundle` 是否多/少了一层目录；完整复制同一台机器的导出目录，不要只复制 JSON |
+| `缺少或无法执行前置 CLI: codex, claude` | 在同一开发用户终端确认 `codex --version`、`claude --version` 可执行，并检查 PATH 或显式 CLI 路径；部署脚本不会安装这两个 CLI。纯 IDE 使用 `-NoAgents -NoExtension` |
 | Windows 解压/启动出现 `Access denied` 或文件消失 | 使用当前版本修复的 ACL 流程；同时查看 Windows 安全中心保护历史是否隔离了 frp。先确认文件来源与 lock 哈希；脚本不自动关闭防护或添加排除项 |
 | 云端 443 被占用 | 用 `sudo ss -ltnp 'sport = :443'` 找到占用者；处理现有服务冲突后重跑，不要另建 state 来绕过 |
 | 安装完成但 doctor 失败 | 检查云端 `status`、Windows 服务/任务和网络；自定义路径始终传同一个 `-Root`。Windows frpc 日志在 `%ProgramData%\RemoteCode\<机器标识>\logs`，QQ 日志在 `<Root>\logs\qq.err.log` / `qq.out.log` |
@@ -310,4 +318,4 @@ Windows 用 `-Action 动作`（默认 `install`），Bash 用位置参数动作�
 
 - [QQ Bot 安装、绑定、审批与截图](docs/qq-bot.md)
 - [随包资源来源与许可](assets/README.md)
-- [ACP 协议](https://agentclientprotocol.com/)、[Codex CLI](https://learn.chatgpt.com/docs/codex/cli)、[Claude Code](https://code.claude.com/docs/en/setup)、[cc-switch](https://github.com/OpenCils/cc-switch-cli)
+- [ACP 协议](https://agentclientprotocol.com/)、[Codex CLI](https://learn.chatgpt.com/docs/codex/cli)、[Claude Code](https://code.claude.com/docs/en/setup)

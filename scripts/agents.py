@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 """Install ACP adapters and use prerequisite Codex/Claude CLIs in the home runtime.
 
-Codex CLI and Claude CLI are prerequisites: already installed and directly
-callable. When a CLI is found on PATH (or given via --codex-path/--claude-path)
-it is used as-is and the ACP adapters are pointed at it; otherwise a
-version-locked npm copy is installed as a fallback. Provider/model switching via
-tools such as cc-switch is honored because it only rewrites the shared
-~/.codex/config.toml / ~/.claude/settings.json that the resolved CLI reads.
+Codex CLI and Claude CLI must already be installed, configured and callable by
+the developer account. Only ACP adapters are installed here. Missing or broken
+CLIs are an error; model credentials and login are managed outside this script.
 """
 import argparse
 import os
@@ -21,11 +18,7 @@ ADAPTERS = {
     "codex-acp": "@agentclientprotocol/codex-acp",
     "claude-agent-acp": "@agentclientprotocol/claude-agent-acp",
 }
-CLIS = {
-    "codex": "@openai/codex",
-    "claude": "@anthropic-ai/claude-code",
-}
-ALL = {**ADAPTERS, **CLIS}
+CLIS = ("codex", "claude")
 # Adapter env var that points each adapter at a specific prerequisite CLI binary.
 ADAPTER_ENV = {"codex": "CODEX_PATH", "claude": "CLAUDE_CODE_EXECUTABLE"}
 
@@ -65,7 +58,7 @@ def npm_command(node):
 
 
 def executable(root, node, key):
-    package_dir = root / "agents/node_modules" / ALL[key]
+    package_dir = root / "agents/node_modules" / ADAPTERS[key]
     package = read(package_dir / "package.json")
     bins = package["bin"]
     relative = bins if isinstance(bins, str) else bins.get(key, next(iter(bins.values())))
@@ -85,9 +78,10 @@ def find_cli(key, args):
     candidates = []
     if explicit:
         candidates.append(Path(explicit).expanduser())
-    which = shutil.which(key)
-    if which:
-        candidates.append(Path(which))
+    else:
+        which = shutil.which(key)
+        if which:
+            candidates.append(Path(which))
     for candidate in candidates:
         try:
             candidate = candidate.resolve()
@@ -105,7 +99,11 @@ def find_cli(key, args):
 
 
 def resolve_clis(args):
-    return {key: find_cli(key, args) for key in CLIS}
+    resolved = {key: find_cli(key, args) for key in CLIS}
+    missing = [key for key, binary in resolved.items() if not binary]
+    require(not missing, "缺少或无法执行前置 CLI: " + ", ".join(missing)
+            + "；请先确保本机 Codex CLI 和 Claude CLI 可用，并加入 PATH 或指定 --codex-path/--claude-path。")
+    return resolved
 
 
 def _backup(path):
@@ -121,8 +119,7 @@ def adapter_agents(root, node, env, resolved):
                                 ("Claude (local ACP)", "claude-agent-acp", "claude")):
         command = executable(root, node, key)
         agent_env = {"PATH": env["PATH"]}
-        if resolved.get(cli_key):
-            agent_env[ADAPTER_ENV[cli_key]] = resolved[cli_key]
+        agent_env[ADAPTER_ENV[cli_key]] = resolved[cli_key]
         agents[label] = {"command": command[0], "args": command[1:], "env": agent_env}
     return agents
 
@@ -166,11 +163,11 @@ def main():
     install.add_argument("--registry", default="https://registry.npmjs.org")
     install.add_argument("--npm-cache", type=Path)
     install.add_argument("--offline", action="store_true", help="需要此平台完整 npm 缓存和已有 package-lock.json")
-    for key in ALL:
+    for key in ADAPTERS:
         install.add_argument("--" + key + "-version", default="latest")
     subs.add_parser("settings")
     execute = subs.add_parser("exec")
-    execute.add_argument("tool", choices=ALL)
+    execute.add_argument("tool", choices=(*ADAPTERS, *CLIS))
     execute.add_argument("arguments", nargs=argparse.REMAINDER)
     subs.add_parser("uninstall")
     args = parser.parse_args()
@@ -179,7 +176,7 @@ def main():
     if args.action == "uninstall":
         shutil.rmtree(root / "agents", ignore_errors=True)
         (root / "acp-settings.json").unlink(missing_ok=True)
-        print("仅删除本项目安装的 ACP 适配器/回退 CLI；既有 .codex/.claude、登录凭据与项目保留。")
+        print("已删除本项目的 ACP 适配器；本机 CLI、用户配置与项目保留。")
         return
     node = find_node(root)
     require(node, "请先安装 Node.js 22+（建议 22 LTS）")
@@ -206,18 +203,14 @@ def main():
         if args.npm_cache:
             env["npm_config_cache"] = str(args.npm_cache.resolve())
         agent_dir.mkdir(parents=True, exist_ok=True)
-        deps = dict(ADAPTERS)
-        for key, package in CLIS.items():
-            if not resolved.get(key):
-                deps[key] = package
-        ensure_lock(args, npm, env, agent_dir, deps)
+        ensure_lock(args, npm, env, agent_dir, ADAPTERS)
         command = npm + ["ci", "--prefix", str(agent_dir), "--registry", args.registry, "--no-audit", "--no-fund"]
         if args.npm_cache:
             command += ["--cache", str(args.npm_cache.resolve())]
         if args.offline:
             command += ["--offline"]
         run(command, env=env)
-        print("适配器安装完成；Codex/Claude CLI 按前置要求检测，未检测到才使用版本锁定副本。")
+        print("ACP 适配器安装完成，使用已检测到的本机 Codex/Claude CLI。")
     if args.action in ("install", "settings"):
         # Apply in the browser's Remote/Machine Settings JSON, never overwrite existing user settings.
         write(root / "acp-settings.json", {"acp.agents": adapter_agents(root, node, env, resolved),
@@ -226,7 +219,7 @@ def main():
         print(f"把 {root / 'acp-settings.json'} 的设置合并到浏览器 IDE 的远程设置，扩展使用 formulahendry.acp-client。")
     elif args.action == "exec":
         extra = args.arguments[1:] if args.arguments[:1] == ["--"] else args.arguments
-        if args.tool in CLIS and resolved.get(args.tool):
+        if args.tool in CLIS:
             run([resolved[args.tool]] + extra, env=env)
         else:
             run(executable(root, node, args.tool) + extra, env=env)

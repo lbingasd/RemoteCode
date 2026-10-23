@@ -500,6 +500,10 @@ def home_setup(args, root):
     require(args.bundle and args.workspace, "家庭端 install 需要 --bundle 和 --workspace")
     workspace = args.workspace.expanduser().resolve()
     require(not workspace.is_relative_to(root) and not root.is_relative_to(workspace), "工作区与安装目录必须互相独立")
+    if not args.no_agents:
+        from agents import resolve_clis
+        # Fail before downloading/installing the runtime when prerequisites are absent.
+        cli_paths = resolve_clis(args)
     pair = read(args.bundle / "machine.json")
     validate_pair(pair)
     platform_name = host_platform()
@@ -530,8 +534,6 @@ def home_setup(args, root):
     if not args.no_agents:
         require(shutil.which("git"), "缺少 Git，取消 --skip-deps 或先安装 Git")
         ensure_node(root, args)
-        from agents import resolve_clis
-        cli_paths = resolve_clis(args)
         cli_extra = []
         if args.codex_path:
             cli_extra += ["--codex-path", str(args.codex_path)]
@@ -546,7 +548,7 @@ def home_setup(args, root):
             write(setupfile, progress)
         else:
             script("agents.py", "--root", root, *cli_extra, "settings")
-            print("CLI/ACP 已安装且版本一致，跳过 npm ci。")
+            print("ACP 已安装且本机 CLI 路径一致，跳过 npm ci。")
         merge_settings(root)
     if not args.no_extension:
         install_extension(root, args)
@@ -577,7 +579,7 @@ def home_setup(args, root):
         print("已跳过自动运行项；用 local.py run-ide / run-frpc 分别启动后再 doctor。")
     script("local.py", "--root", root, "url")
     print(f"初次 token 链接和密码仅在自己终端查看：{sys.executable} {SCRIPTS / 'local.py'} --root {root} url --show-secrets")
-    print("接下来：iPad 信任公共 CA；在家庭电脑用 agents.py exec codex -- login / exec claude 登录。")
+    print("接下来：iPad 信任公共 CA，在浏览器 IDE 中连接本机 ACP agent。")
 
 
 def parser():
