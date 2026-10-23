@@ -19,6 +19,9 @@ id_rsa
 id_ed25519
 enrollment/
 *-enrollment/
+# Unredacted screenshots removed from Git history; publish the redacted image only.
+/docs/evidence/browser-terminal-macos.png
+/docs/evidence/browser-terminal-macos.jpg
 machine.json
 local.json
 state.json

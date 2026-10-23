@@ -335,7 +335,7 @@ RemoteCode 自有代码和文档采用 [MIT License](LICENSE)。协议原文见�
 
 随包的 NSSM、ACP Client 扩展，以及部署时下载的 VS Code Server、frp、ACP 适配器等第三方组件，分别适用各自的许可与使用条款，不因本项目采用 MIT 而改变。随包资源来源与原许可位置见 [assets/README.md](assets/README.md)；安装 VS Code Server 仍需显式传入 `-AcceptLicense` / `--accept-license`。
 
-发布仓库或工具包时只分发源代码、公开资源与脱敏验证记录；不要加入云端 state、家庭运行目录、机器配对包、私钥、QQ AppSecret、模型凭据、含 token 的链接或日志。2026-10-23 已检查当前跟踪文件、部署归档和本地可达 Git 历史，未发现真实私钥或凭据；扫描范围及截图中保留的本机标识见 [发布内容检查记录](docs/evidence/publication-review.md)。
+发布仓库或工具包时只分发源代码、公开资源与脱敏验证记录；不要加入云端 state、家庭运行目录、机器配对包、私钥、QQ AppSecret、模型凭据、含 token 的链接或日志。2026-10-23 已检查当前跟踪文件、部署归档和本地可达 Git 历史，未发现真实私钥或凭据，并从 Git 历史移除原始截图与旧部署包；扫描范围和历史清理边界见 [发布内容检查记录](docs/evidence/publication-review.md)。
 
 ## 参考
 
