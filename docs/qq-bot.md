@@ -104,7 +104,7 @@ QQ 单独卸载停止服务，删除受管理的 QQ agent/skill、AppSecret、�
 
 本次定向自动化覆盖：接收者校验、重复事件、过期/取消/失联请求、一次性选项、发送失败回退、配对码、截图查找、回环接口认证、HTTP 200 业务错误、token 刷新及分片上传序列，以及真实子进程的 ACP 透传。Mock QQ 响应不能代替真实 AppID/AppSecret、账号权限、手机收发和模型操作验收。
 
-2026-10-22 已在当前 mac1 部署用户 LaunchAgent、ACP 代理及用户截图 skill；真实 Codex adapter 通过代理响应 `initialize`，协议版本 1、认证方法 2 项。部署时尚未输入 QQ 凭据，不能据此宣称 QQ 真实上线、手机审批或截图收发已通过。Windows/Linux 生命周期未在目标系统实测。
+2026-10-22 已在当前 mac1 部署用户 LaunchAgent、ACP 代理及用户截图 skill；真实 Codex adapter 通过代理响应 `initialize`，协议版本 1、认证方法 2 项。部署时尚未输入 QQ 凭据，不能据此宣称 QQ 真实上线、手机审批或截图收发已通过。当时 Windows/Linux 生命周期未在目标系统实测。
 
 同日修复了当前 Python 无默认 CA 导致的鉴权失败：修复前实测 `SSLCertVerificationError`（verify code 20），系统 curl TLS 校验成功；修复后 Python 使用系统 CA，向官方接口发送虚构凭据并收到 QQ 业务错误 100007，证明 TLS/JSON 链路可用，不代表真实 AppID/AppSecret 验证通过。此轮仅运行 13 项 Python QQ 定向测试，全部通过，未重新执行全量回归。
 
@@ -113,6 +113,8 @@ QQ 单独卸载停止服务，删除受管理的 QQ agent/skill、AppSecret、�
 真实 QQ + 已部署代理 + 模拟 ACP adapter 的审批通知已发送，5 分钟内未收到审批选择，代理收到 `cancelled` 并正常结束；未执行 shell、修改项目或调用模型。这验证了通知发送和超时取消路径，不能视为人工回复审批或真实 Codex 模型任务验收通过。上传修复最后运行 18 项 Node QQ 定向测试，全部通过；更新部署后再次确认 Bot 在线且绑定保留、无待审批请求。
 
 随后重发的真实 QQ 审批往返已通过：用户收到并回复，代理对原 JSON-RPC 审批请求返回 `selected / smoke-allow-once`，模拟 adapter 返回 `QQ_ACP_ROUNDTRIP` 测试标记，本机待审批数为 0。该测试不执行 shell、不修改项目、不调用模型；真实 QQ 人工回复与代理回填已验证，真实 Codex 模型工具执行仍未验收。同时修正代理结束清理时覆盖已决定结果的审计问题：仅未决定请求可以被普通连接取消，已选定结果保留。
+
+2026-10-23 在 Windows 完成 QQ 组件部署、真实凭据校验与网关上线，修复默认编码和 PowerShell 将原生 stderr 当终止错误的问题。清理已核实的旧 Bot 残留进程后状态为 `configured=true, online=true`；本轮没有把手机绑定、审批或截图往返记为已验收。25 项 Python 定向测试和 34 项 Node QQ 测试通过，详情见 [Windows 验证记录](evidence/windows-deployment.md)。
 
 - [QQ 鉴权](https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/access-token.html)
 - [QQ API 地址与错误码](https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/api-call-guide.html)
