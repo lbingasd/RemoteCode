@@ -23,9 +23,9 @@ flowchart LR
 
 ## 界面示例
 
-浏览器中的 VS Code Web、ACP 面板与家庭电脑终端。下图来自 macOS 原生验证，不代表模型任务或 iPad 操作已完成验收。
+浏览器中的 VS Code Web、ACP 面板与家庭电脑终端。下图来自 macOS 原生验证，终端中的用户名、主机名和本机路径已加马赛克，不代表模型任务或 iPad 操作已完成验收。
 
-![浏览器 IDE、ACP 面板与本机终端](docs/evidence/browser-terminal-macos.jpg)
+![浏览器 IDE、ACP 面板与本机终端（已打码）](docs/evidence/browser-terminal-macos-redacted.png)
 
 <details>
 <summary>查看 WebView 布局兼容性测试截图</summary>
