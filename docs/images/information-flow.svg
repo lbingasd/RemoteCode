@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1030" viewBox="0 0 900 1030" role="img" aria-labelledby="title desc">
+  <title id="title">RemoteCode 信息流</title>
+  <desc id="desc">iPad 通过 HTTPS 443 访问云端 nginx，再由回环地址转发到专属 frps。家庭 frpc 主动向云端 nginx 建立 WSS 443 连接，隧道将请求送到家庭 VS Code Web。ACP 适配器调用本机 Codex 或 Claude CLI，工具在家庭电脑运行，模型请求从家庭端直接发送到模型服务。响应沿已有连接返回。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 Z" fill="#64748b"/>
+    </marker>
+    <marker id="arrow-start" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 10 0 L 0 5 L 10 10 Z" fill="#64748b"/>
+    </marker>
+    <style>
+      text { font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #172b4d; }
+      .heading { font-size: 21px; font-weight: 700; }
+      .label { font-size: 18px; fill: #475569; }
+      .detail { font-size: 16px; fill: #475569; }
+      .card { fill: #fff; stroke: #94a3b8; stroke-width: 1.5; }
+      .flow { fill: none; stroke: #64748b; stroke-width: 2; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="900" height="1030" rx="16" fill="#fff"/>
+  <rect x="30" y="170" width="840" height="190" rx="16" fill="#eff6ff" stroke="#bfdbfe"/>
+  <rect x="30" y="455" width="840" height="405" rx="16" fill="#f0fdf4" stroke="#bbf7d0"/>
+
+  <rect class="card" x="150" y="24" width="230" height="76" rx="12"/>
+  <text class="heading" x="265" y="56" text-anchor="middle">iPad 浏览器</text>
+  <text class="detail" x="265" y="81" text-anchor="middle">Safari / 浏览器 IDE</text>
+  <path class="flow" d="M265 100 V230"/>
+  <text class="label" x="285" y="140">HTTPS · TCP 443</text>
+
+  <text class="heading" x="54" y="205">云服务器</text>
+  <text class="detail" x="846" y="205" text-anchor="end">公网入口仅 TCP 443</text>
+  <rect class="card" x="150" y="232" width="230" height="78" rx="12"/>
+  <text class="heading" x="265" y="265" text-anchor="middle">nginx</text>
+  <text class="detail" x="265" y="291" text-anchor="middle">HTTPS 入口 / 认证 / TLS</text>
+  <path class="flow" d="M380 271 H538"/>
+  <text class="label" x="460" y="250" text-anchor="middle">回环转发</text>
+  <rect class="card" x="540" y="232" width="230" height="78" rx="12"/>
+  <text class="heading" x="655" y="265" text-anchor="middle">该机器的 frps</text>
+  <text class="detail" x="655" y="291" text-anchor="middle">独立隧道与凭据</text>
+
+  <path d="M655 315 V501" fill="none" stroke="#64748b" stroke-width="2.5" stroke-dasharray="7 6" marker-start="url(#arrow-start)" marker-end="url(#arrow)"/>
+  <text class="label" x="625" y="400" text-anchor="end">家庭 frpc 主动向云端 nginx 建立连接</text>
+  <text class="detail" x="625" y="426" text-anchor="end">WSS · TCP 443；请求与响应复用已建立的隧道</text>
+
+  <text class="heading" x="54" y="490">家庭电脑</text>
+  <text class="detail" x="655" y="609" text-anchor="middle">无需开放公网入站端口</text>
+  <rect class="card" x="540" y="505" width="230" height="70" rx="12"/>
+  <text class="heading" x="655" y="535" text-anchor="middle">frpc</text>
+  <text class="detail" x="655" y="559" text-anchor="middle">主动连接云端</text>
+  <path class="flow" d="M540 540 H382"/>
+  <text class="label" x="460" y="526" text-anchor="middle">本机转发</text>
+  <rect class="card" x="150" y="505" width="230" height="70" rx="12"/>
+  <text class="heading" x="265" y="535" text-anchor="middle">VS Code Web</text>
+  <text class="detail" x="265" y="559" text-anchor="middle">回环地址上的 IDE</text>
+  <path class="flow" d="M265 575 V633"/>
+  <text class="detail" x="285" y="610">ACP 会话</text>
+  <rect class="card" x="150" y="635" width="230" height="70" rx="12"/>
+  <text class="heading" x="265" y="665" text-anchor="middle">ACP 适配器 / CLI</text>
+  <text class="detail" x="265" y="689" text-anchor="middle">本机 Codex / Claude</text>
+  <path class="flow" d="M265 705 V763"/>
+  <text class="detail" x="285" y="741">本机执行</text>
+  <rect class="card" x="150" y="765" width="230" height="70" rx="12"/>
+  <text class="heading" x="265" y="795" text-anchor="middle">项目 / 终端 / 工具</text>
+  <text class="detail" x="265" y="819" text-anchor="middle">项目文件与工具在本机运行</text>
+
+  <path class="flow" d="M380 670 H655 V903"/>
+  <text class="label" x="675" y="753">在线模型请求</text>
+  <text class="detail" x="675" y="779">由本机 CLI 发起</text>
+  <rect x="540" y="905" width="230" height="70" rx="12" fill="#faf5ff" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text class="heading" x="655" y="935" text-anchor="middle">模型服务</text>
+  <text class="detail" x="655" y="959" text-anchor="middle">使用本机 CLI 的服务配置</text>
+
+  <text class="detail" x="450" y="1008" text-anchor="middle">实线：访问与调用方向　　虚线：双向隧道　　响应沿已有连接返回</text>
+</svg>

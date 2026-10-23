@@ -4,17 +4,7 @@
 
 ## 信息流
 
-```mermaid
-flowchart LR
-    Browser[iPad 浏览器] -->|HTTPS 443| Edge[云端 nginx]
-    Edge -->|本机回环转发| Server[该机器的 frps]
-    Server <-->|已建立的隧道| Client[家庭 frpc]
-    Client -. 主动出站 WSS 443 .-> Edge
-    Client --> IDE[家庭 VS Code Web]
-    IDE --> Agent[本机 ACP 适配器 / CLI]
-    Agent --> Tools[本机项目、终端和工具]
-    Agent -->|在线推理| Model[模型服务]
-```
+![RemoteCode 信息流：浏览器、云端网关、家庭电脑与模型服务](docs/images/information-flow.svg)
 
 - 家庭 frpc 主动连接云端，浏览器请求沿隧道到达家庭 IDE，响应原路返回；家庭网络无需开放公网入站端口。
 - 云端只发布 TCP 443；每台机器使用独立隧道、token 和浏览器密码，IDE 与内部转发端口只监听回环地址。
