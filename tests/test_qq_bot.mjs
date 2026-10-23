@@ -372,7 +372,8 @@ for line in sys.stdin:
   print(json.dumps({'jsonrpc':'2.0','id':2,'result':m['result']}),flush=True)
 `);
   const proxy = fileURLToPath(new URL('../scripts/acp_qq_proxy.py', import.meta.url));
-  const child = spawn('python3', [proxy, '--root', root, '--', 'python3', fake], {stdio: ['pipe','pipe','pipe']});
+  const python = process.env.REMOTECODE_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+  const child = spawn(python, [proxy, '--root', root, '--', python, fake], {stdio: ['pipe','pipe','pipe']});
   t.after(() => {child.stdin.end(); child.kill();});
   child.stdin.write(JSON.stringify({jsonrpc: '2.0', id: 2, method: 'session/prompt'}) + '\n');
   const output = new Promise((resolve, reject) => {

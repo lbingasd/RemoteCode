@@ -90,8 +90,13 @@ def restrict_windows(root):
         # chmod does not implement Windows ACLs. Keep profile secrets private on NTFS.
         sid = subprocess.check_output(["whoami", "/user", "/fo", "csv", "/nh"], text=True).strip().split(",")[-1].strip('"')
         require(re.fullmatch(r"S-1-[0-9-]+", sid), "无法读取当前 Windows SID")
-        run(["icacls", root, "/inheritance:r", "/grant:r", f"*{sid}:(OI)(CI)F",
-             "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F", "/T", "/Q"], stdout=subprocess.DEVNULL)
+        # Recursive targets need an effective ACE on each existing file. Applying
+        # only (OI)(CI) to files leaves them with no usable permissions on Windows.
+        run(["icacls", root, "/inheritance:r", "/grant:r", f"*{sid}:F",
+             "*S-1-5-18:F", "*S-1-5-32-544:F", "/T", "/Q"], stdout=subprocess.DEVNULL)
+        # Keep inheritable ACEs on the runtime root for files created later.
+        run(["icacls", root, "/grant:r", f"*{sid}:(OI)(CI)F",
+             "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F", "/Q"], stdout=subprocess.DEVNULL)
         return sid
 
 

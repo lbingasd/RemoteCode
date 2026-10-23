@@ -8,6 +8,7 @@ param(
     [switch]$NoService
 )
 $ErrorActionPreference = 'Stop'
+$env:PYTHONUTF8 = '1'
 if ($env:OS -ne 'Windows_NT') { throw 'Use deploy-qq.sh on macOS/Linux.' }
 $Candidates = @($env:REMOTECODE_PYTHON, "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe", "$env:ProgramFiles\Python312\python.exe")
 $Candidates += @(Get-Command python.exe,python3.exe -All -ErrorAction SilentlyContinue | ForEach-Object { $_.Source })

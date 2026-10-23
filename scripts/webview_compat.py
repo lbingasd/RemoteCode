@@ -11,6 +11,8 @@ import tempfile
 BUNDLE = Path("out/vs/code/browser/workbench/workbench.js")
 TEMPLATE = Path("out/vs/code/browser/workbench/workbench.html")
 ORIGINAL_SHA256 = "43730cccef6d7fb38daabae0a7a0b99c37bfa4ceb1cfe421e2ecd96e1b8fde27"
+# Windows 1.143.0, from the SHA-256-verified windows-amd64.lock.json archive.
+WINDOWS_SHA256 = "7580b4a44d3e48a0d5cb8c03b28632f80ff5952dbf07cb80c7051a293ead1975"
 START = "var Y4e=class{constructor(){this.content=document.createElement(\"div\")"
 END = ";var smi="
 MARKER = "/* RemoteCode WebView layout fallback v1 */"
@@ -133,7 +135,7 @@ def digest(data):
 
 
 def patched_bundle(original):
-    if digest(original) != ORIGINAL_SHA256:
+    if digest(original) not in (ORIGINAL_SHA256, WINDOWS_SHA256):
         raise ValueError("未知 VS Code workbench 版本；拒绝修改。请先核实版本及 Safari 兼容性。")
     text = original.decode("utf-8")
     start = text.index(START)

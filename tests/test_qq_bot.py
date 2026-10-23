@@ -144,7 +144,7 @@ class ConfigurationTests(unittest.TestCase):
              patch.object(qq_bot.Path, 'is_file', return_value=True), \
              patch.dict(qq_bot.os.environ, {'SSL_CERT_FILE': '', 'SSL_CERT_DIR': ''}):
             self.assertIs(qq_bot.qq_tls_context(), context)
-        context.load_verify_locations.assert_called_once_with(cafile='/etc/ssl/cert.pem')
+        context.load_verify_locations.assert_called_once_with(cafile=str(Path('/etc/ssl/cert.pem')))
         self.assertNotIn('check_hostname', context.__dict__)
         self.assertNotIn('verify_mode', context.__dict__)
 

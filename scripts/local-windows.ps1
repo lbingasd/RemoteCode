@@ -90,7 +90,10 @@ switch ($Action) {
         $FrpcText = [regex]::Replace($FrpcText, '(?m)^transport\.tls\.trustedCaFile = .*$', ('transport.tls.trustedCaFile = "' + $ServiceCA + '"'))
         [IO.File]::WriteAllText((Join-Path $ServiceRoot 'frpc.toml'), $FrpcText, (New-Object Text.UTF8Encoding($false)))
         New-Item -ItemType Directory -Path (Join-Path $ServiceRoot 'logs') -Force | Out-Null
-        Invoke-Native 'icacls.exe' @($ServiceRoot, '/inheritance:r', '/grant:r', '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-19:(OI)(CI)RX', '/T', '/Q')
+        # Existing files need effective ACEs; inheritance-only ACEs leave regular
+        # files unreadable after a recursive icacls pass.
+        Invoke-Native 'icacls.exe' @($ServiceRoot, '/inheritance:r', '/grant:r', '*S-1-5-18:F', '*S-1-5-32-544:F', '*S-1-5-19:RX', '/T', '/Q')
+        Invoke-Native 'icacls.exe' @($ServiceRoot, '/grant:r', '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-19:(OI)(CI)RX', '/Q')
         Invoke-Native 'icacls.exe' @((Join-Path $ServiceRoot 'logs'), '/grant:r', '*S-1-5-19:(OI)(CI)M', '/Q')
         $Nssm = Join-Path $ServiceRoot 'nssm.exe'
         Invoke-Native (Join-Path $ServiceRoot 'frpc.exe') @('verify', '-c', (Join-Path $ServiceRoot 'frpc.toml'))

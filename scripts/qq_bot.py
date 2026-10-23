@@ -250,7 +250,9 @@ def service(root, action):
         def ps(value):
             return "'" + str(value).replace("'", "''") + "'"
         runner = root / 'qq/run-qq.ps1'
-        write(runner, '$ErrorActionPreference="Stop"\n& ' + ' '.join(ps(x) for x in command)
+        # Windows PowerShell treats native stderr as error records. Node writes
+        # normal lifecycle messages there; use its exit code to decide failure.
+        write(runner, '$ErrorActionPreference="Continue"\n& ' + ' '.join(ps(x) for x in command)
               + ' >> ' + ps(logdir / 'qq.out.log') + ' 2>> ' + ps(logdir / 'qq.err.log') + '\nexit $LASTEXITCODE\n')
         script = '$ErrorActionPreference="Stop"; $n=' + ps(name) + '; $old=Get-ScheduledTask -TaskName $n -ErrorAction SilentlyContinue; '
         expected = '-NoProfile -ExecutionPolicy Bypass -File "' + str(runner) + '"'

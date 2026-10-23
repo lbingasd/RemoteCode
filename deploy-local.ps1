@@ -13,7 +13,7 @@ param(
     [string]$Root = "$env:USERPROFILE\RemoteCode",
     [string]$Bundle,
     [string]$Workspace,
-    [string]$Cache = (Join-Path $PSScriptRoot 'downloads'),
+    [string]$Cache,
     [string]$Lock,
     [string]$Mirror,
     [string]$Registry,
@@ -35,6 +35,7 @@ param(
     [string]$NssmSha256,
     [switch]$Help
 )
+$Cache = if ($Cache) { $Cache } else { Join-Path $PSScriptRoot 'downloads' }
 $ErrorActionPreference = 'Stop'
 
 function Refresh-DependencyPath {

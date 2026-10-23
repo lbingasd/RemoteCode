@@ -47,6 +47,13 @@ class WebviewCompatTests(unittest.TestCase):
         self.assertFalse(self.bundle.with_suffix('.js.remotecode-original').exists())
         self.assertEqual(self.template.read_bytes(), self.html)
 
+    def test_windows_build_is_supported_without_replacing_original_build(self):
+        with patch.object(compat, 'ORIGINAL_SHA256', '0' * 64), \
+             patch.object(compat, 'WINDOWS_SHA256', hashlib.sha256(self.original).hexdigest()):
+            self.assertIn(compat.MARKER.encode(), compat.patched_bundle(self.original))
+            with self.assertRaises(ValueError):
+                compat.patched_bundle(self.original + b'changed')
+
     def test_later_edits_are_preserved_on_apply_and_restore(self):
         compat.apply_server(self.server)
         later = self.bundle.read_bytes() + b'other patch'
