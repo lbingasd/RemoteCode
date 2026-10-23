@@ -21,6 +21,21 @@ flowchart LR
 - 项目与工具在家庭电脑运行；Codex / Claude 默认向在线模型发送相关上下文。云端会终止 TLS 并代理流量，适用于受信任的个人多机使用。
 - 可选 QQ Bot 由家庭电脑直接连接 QQ，处理 ACP 审批与已授权截图发送；下文介绍安装与配对，详细使用见 [QQ Bot 文档](docs/qq-bot.md)。
 
+## 界面示例
+
+浏览器中的 VS Code Web、ACP 面板与家庭电脑终端。下图来自 macOS 原生验证，不代表模型任务或 iPad 操作已完成验收。
+
+![浏览器 IDE、ACP 面板与本机终端](docs/evidence/browser-terminal-macos.jpg)
+
+<details>
+<summary>查看 WebView 布局兼容性测试截图</summary>
+
+![WebView 布局兼容性测试](docs/evidence/webview-layout-fallback.jpg)
+
+这是独立测试页面，用于检查缩放、滚动、隐藏和恢复等布局行为。
+
+</details>
+
 ## 前置要求与需要你输入的信息
 
 | 位置 | 前置要求 | 你需要输入/准备 |
