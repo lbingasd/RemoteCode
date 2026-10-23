@@ -314,6 +314,14 @@ Windows 用 `-Action 动作`（默认 `install`），Bash 用位置参数动作�
 
 尚未验收（需目标环境）：Linux Docker 容器运行、RHEL 家族云端自动安装、Linux systemd、Windows 重启/注销/Headless 与完整卸载生命周期、当前 Windows QQ 的手机绑定/审批/截图往返、Codex/Claude/ACP 真实模型任务、iPad Safari/蜂窝网络/长期任务恢复和多物理机切换。已完成的单机检查不代表上述场景全部通过。
 
+## 开源协议
+
+RemoteCode 自有代码和文档采用 [MIT License](LICENSE)。协议原文见仓库根目录 `LICENSE`；分发副本时保留其中的版权与许可声明。协议参考 [Open Source Initiative 的 MIT 原文](https://opensource.org/license/mit)。
+
+随包的 NSSM、ACP Client 扩展，以及部署时下载的 VS Code Server、frp、ACP 适配器等第三方组件，分别适用各自的许可与使用条款，不因本项目采用 MIT 而改变。随包资源来源与原许可位置见 [assets/README.md](assets/README.md)；安装 VS Code Server 仍需显式传入 `-AcceptLicense` / `--accept-license`。
+
+发布仓库或工具包时只分发源代码、公开资源与脱敏验证记录；不要加入云端 state、家庭运行目录、机器配对包、私钥、QQ AppSecret、模型凭据、含 token 的链接或日志。2026-10-23 已检查当前跟踪文件、部署归档和本地可达 Git 历史，未发现真实私钥或凭据；扫描范围及截图中保留的本机标识见 [发布内容检查记录](docs/evidence/publication-review.md)。
+
 ## 参考
 
 - [QQ Bot 安装、绑定、审批与截图](docs/qq-bot.md)

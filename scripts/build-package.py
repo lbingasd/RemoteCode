@@ -10,7 +10,7 @@ PACKAGE = Path(__file__).resolve().parent.parent
 
 
 def build(output):
-    files = [PACKAGE / name for name in ("README.md", ".gitignore", "deploy-cloud.sh", "deploy-local.sh", "deploy-local.ps1", "deploy-qq.sh", "deploy-qq.ps1")]
+    files = [PACKAGE / name for name in ("README.md", "LICENSE", ".gitignore", "deploy-cloud.sh", "deploy-local.sh", "deploy-local.ps1", "deploy-qq.sh", "deploy-qq.ps1")]
     for folder, suffixes in (("scripts", {".py", ".sh", ".ps1", ".mjs"}), ("tests", {".py", ".ps1", ".mjs"}),
                              ("examples", {".json"}), ("docs", {".md", ".json", ".png"})):
         files += [path for path in (PACKAGE / folder).rglob("*")

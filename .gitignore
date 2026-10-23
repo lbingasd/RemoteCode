@@ -12,6 +12,13 @@ downloads/
 !.env.example
 *.pem
 *.key
+*.p12
+*.pfx
+*.ppk
+id_rsa
+id_ed25519
+enrollment/
+*-enrollment/
 machine.json
 local.json
 state.json
