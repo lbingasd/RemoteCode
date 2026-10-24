@@ -435,13 +435,16 @@ def windows_service(root, action, args, nssm=None):
         params += f" -NssmPath {ps_literal(nssm)} -NssmSha256 {ps_literal(sha256(nssm))}"
     if args.headless:
         params += " -Headless"
-    command = "$ErrorActionPreference='Stop'; try { & " + ps_literal(SCRIPTS / "local-windows.ps1") + " " + params + "; exit 0 } catch { Write-Error $_; exit 1 }"
+    logfile = root / 'logs/windows-service.log'
+    command = "$ErrorActionPreference='Stop'; try { & " + ps_literal(SCRIPTS / "local-windows.ps1") + " " + params + " *>&1 | Out-File -LiteralPath " + ps_literal(logfile) + " -Append -Encoding utf8; exit 0 } catch { $_.Exception.Message | Out-File -LiteralPath " + ps_literal(logfile) + " -Append -Encoding utf8; exit 1 }"
+    if action == 'Status':
+        command = "$ErrorActionPreference='Stop'; & " + ps_literal(SCRIPTS / 'local-windows.ps1') + ' ' + params
     encoded = base64.b64encode(command.encode("utf-16-le")).decode()
     powershell = str(Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe")
     if action == "Status" or ctypes.windll.shell32.IsUserAnAdmin():
         run([powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded])
     else:
-        outer = "$p=Start-Process -FilePath " + ps_literal(powershell) + " -Verb RunAs -Wait -PassThru -ArgumentList '-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + encoded + "'; exit $p.ExitCode"
+        outer = "$p=Start-Process -FilePath " + ps_literal(powershell) + " -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList '-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + encoded + "'; exit $p.ExitCode"
         run([powershell, "-NoProfile", "-Command", outer])
 
 
@@ -558,6 +561,9 @@ def home_setup(args, root):
         script("qq_bot.py", "install", "--root", root, *extra)
     if not args.no_service:
         if os.name == "nt":
+            from local import write_windows_task
+            write_windows_task(root, read(root / 'local.json'))
+            shutil.copy2(SCRIPTS / 'windows_ide.py', root / 'windows_ide.py')
             nssm = prepare_nssm(root, args)
             windows_service(root, "Install", args, nssm)
         else:

@@ -124,6 +124,10 @@ bash deploy-local.sh install --bundle ./pc1 --workspace "$HOME/Projects" --accep
 
 Windows 默认创建 `RemoteCode-frpc-<机器标识>` 系统服务和 `RemoteCode-IDE-<机器标识>` 计划任务：frpc 以 LocalService 运行，IDE 以当前开发用户运行，默认需要该用户登录。仅注册服务步骤会弹 UAC，安装命令本身应在普通 PowerShell 中运行。需要 IDE 在未登录时随开机启动，可加 `-Headless`，并在提示时输入同一 Windows 账号的密码（不是 PIN）。这不会改变 QQ Bot 的登录后启动方式。
 
+IDE 计划任务使用 `pythonw.exe` 无窗口守护，不再直接打开 Node 控制台；IDE 进程退出后约 5 秒重启。守护进程退出后，任务每分钟尝试恢复；重复触发不会创建多个 IDE。日志位于 `<Root>\logs\ide-supervisor.log`，只记录启动、退出码和重试，不记录 IDE 输出或访问 token。默认登录模式下，注销、关机和休眠仍会中断访问，不能保证正在运行的终端命令或模型任务在故障后继续。
+
+原有安装重跑同一安装命令会迁移为新守护任务。需要主动停用时，在同一账号的管理员 PowerShell 执行 `.\scripts\local-windows.ps1 -Action Stop -Root "$env:USERPROFILE\RemoteCode"`，该命令会先禁用 IDE 恢复触发，再停止 IDE 和 frpc；恢复运行用 `-Action Start`。仅在任务管理器结束进程会触发自动恢复。
+
 安装结束后应看到健康检查成功及访问地址。Windows 可再次执行：
 
 ```powershell
@@ -306,6 +310,7 @@ Windows 用 `-Action 动作`（默认 `install`），Bash 用位置参数动作�
 | Windows 解压/启动出现 `Access denied` 或文件消失 | 使用当前版本修复的 ACL 流程；同时查看 Windows 安全中心保护历史是否隔离了 frp。先确认文件来源与 lock 哈希；脚本不自动关闭防护或添加排除项 |
 | 云端 443 被占用 | 用 `sudo ss -ltnp 'sport = :443'` 找到占用者；处理现有服务冲突后重跑，不要另建 state 来绕过 |
 | 安装完成但 doctor 失败 | 检查云端 `status`、Windows 服务/任务和网络；自定义路径始终传同一个 `-Root`。Windows frpc 日志在 `%ProgramData%\RemoteCode\<机器标识>\logs`，QQ 日志在 `<Root>\logs\qq.err.log` / `qq.out.log` |
+| frpc 正常但 IDE 任务停止，退出码 `3221225786` / `0xC000013A` | 该退出码表示控制台终止；旧任务直接启动 Node，可能随控制台被结束。更新后重跑相同安装命令迁移为无窗口守护及每分钟恢复任务；查看 `<Root>\logs\ide-supervisor.log`。UAC 服务操作诊断在 `windows-service.log` |
 | QQ 已显示“凭据验证成功”，随后仍提示“请先 configure” | 先用相同 `-Root` 查 `status`。旧版 Windows runner 可能因正常 stderr 输出退出而留下旧 Node 进程；更新后用 `.\deploy-qq.ps1 -Action install -NoConfigure` 重新部署 runner，再运行 `-Action restart` 并查看 `configured`。若仍为 false，需按部署记录核实并处理旧进程，不能只反复输入 Secret 或结束所有 Node 进程 |
 | QQ 在线但一直等不到绑定 | 私聊正确 AppID/沙箱环境的 Bot，确认 QQ 账号有测试/使用权限，发送终端显示的最新完整绑定命令；检查单聊事件计数，超时后 `pair` 重试 |
 
@@ -316,6 +321,8 @@ Windows 用 `-Action 动作`（默认 `install`），Bash 用位置参数动作�
 已在本机 macOS 用真实原生栈验证：nginx HTTPS → frps → frpc WSS → VS Code Web 的链路、浏览器 IDE 与终端、ACP 扩展与 WebView、Codex/Claude ACP 的协议 1 `initialize`（未登录模型账号）、macOS LaunchAgents 生命周期、一键安装/重跑/卸载、WebView 布局兼容补丁。证据在 [docs/evidence/](docs/evidence/)。
 
 2026-10-23 已在 Windows 实机完成家庭端安装、frpc/NSSM 服务与 IDE 计划任务启动、IDE HTTP 与云端 TLS 健康检查，以及 QQ 组件部署、真实凭据校验和网关上线。另通过 25 项 Python 定向测试、34 项 Node QQ 测试和 PowerShell 语法/参数转义检查；详见 [Windows 验证记录](docs/evidence/windows-deployment.md)。自动化 QQ 测试使用模拟 QQ 接口，不能代替手机验收。
+
+2026-10-24 在 Windows 实机验证 IDE 自动恢复：受控终止 IDE 后约 5.3 秒重启，终止守护进程后约 50.8 秒由计划任务恢复；恢复后仅一个 IDE 服务进程，本机及云端认证入口均 HTTP 200。原生恢复、进程树清理和配置定向测试通过，详见同一验证记录。
 
 尚未验收（需目标环境）：Linux Docker 容器运行、RHEL 家族云端自动安装、Linux systemd、Windows 重启/注销/Headless 与完整卸载生命周期、当前 Windows QQ 的手机绑定/审批/截图往返、Codex/Claude/ACP 真实模型任务、iPad Safari/蜂窝网络/长期任务恢复和多物理机切换。已完成的单机检查不代表上述场景全部通过。
 

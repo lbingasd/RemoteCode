@@ -26,6 +26,12 @@ function Invoke-Native([string]$Exe, [string[]]$Arguments) {
     if ($LASTEXITCODE -ne 0) { throw "Native command failed ($LASTEXITCODE): $Exe" }
 }
 
+function Resolve-TaskUserSid([string]$TaskUser) {
+    if ($TaskUser -match '^S-1-') { return $TaskUser }
+    if ($TaskUser -notmatch '[\\@]') { $TaskUser = "$env:COMPUTERNAME\$TaskUser" }
+    return (New-Object Security.Principal.NTAccount($TaskUser)).Translate([Security.Principal.SecurityIdentifier]).Value
+}
+
 function Assert-OwnedObjects {
     $Service = Get-Service -Name $Name -ErrorAction SilentlyContinue
     $Task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
@@ -36,11 +42,16 @@ function Assert-OwnedObjects {
         if (-not [string]::Equals($Owner.root, $Root, [StringComparison]::OrdinalIgnoreCase) -or $Owner.machine -ne $Config.id) { throw 'Service directory belongs to another runtime.' }
     }
     if ($Task) {
-        $Expected = Get-Content -LiteralPath (Join-Path $Root 'windows-task.json') -Raw -Encoding UTF8 | ConvertFrom-Json
         $Actions = @($Task.Actions)
-        if ($Actions.Count -ne 1 -or -not [string]::Equals($Actions[0].Execute, $Expected.executable, [StringComparison]::OrdinalIgnoreCase) -or $Actions[0].Arguments -ne $Expected.arguments -or $Actions[0].WorkingDirectory -ne $Expected.working_directory) { throw 'IDE task belongs to a different runtime or has been modified.' }
-        $TaskUser = $Task.Principal.UserId
-        if ($TaskUser -notmatch '^S-1-') { $TaskUser = (New-Object Security.Principal.NTAccount($TaskUser)).Translate([Security.Principal.SecurityIdentifier]).Value }
+        $OwnedAction = $false
+        foreach ($Manifest in @('windows-task.json', 'windows-supervisor-task.json')) {
+            $ManifestPath = Join-Path $Root $Manifest
+            if (-not (Test-Path -LiteralPath $ManifestPath)) { continue }
+            $Expected = Get-Content -LiteralPath $ManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($Actions.Count -eq 1 -and [string]::Equals($Actions[0].Execute, $Expected.executable, [StringComparison]::OrdinalIgnoreCase) -and $Actions[0].Arguments -eq $Expected.arguments -and $Actions[0].WorkingDirectory -eq $Expected.working_directory) { $OwnedAction = $true }
+        }
+        if (-not $OwnedAction) { throw 'IDE task belongs to a different runtime or has been modified.' }
+        $TaskUser = Resolve-TaskUserSid $Task.Principal.UserId
         if ($TaskUser -ne [Security.Principal.WindowsIdentity]::GetCurrent().User.Value) { throw 'IDE task belongs to another developer account.' }
     }
     if ($Service) {
@@ -49,6 +60,35 @@ function Assert-OwnedObjects {
     }
 }
 if ($Action -ne 'Status') { Assert-OwnedObjects }
+
+function Get-IdeTaskAction {
+    $TaskConfig = Get-Content -LiteralPath (Join-Path $Root 'windows-supervisor-task.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+    if (-not (Test-Path -LiteralPath $TaskConfig.executable) -or -not (Test-Path -LiteralPath (Join-Path $Root 'windows_ide.py'))) { throw 'IDE supervisor missing; rerun the local installer.' }
+    New-ScheduledTaskAction -Execute $TaskConfig.executable -Argument $TaskConfig.arguments -WorkingDirectory $TaskConfig.working_directory
+}
+function Get-IdeTaskSettings {
+    New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -Hidden
+}
+function Get-IdeRecoveryTrigger {
+    New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1)
+}
+function Update-IdeTask($Task) {
+    $Desired = Get-IdeTaskAction
+    $Changed = $Task.Actions[0].Execute -ne $Desired.Execute -or $Task.Actions[0].Arguments -ne $Desired.Arguments
+    if ($Changed -and $Task.State -eq 'Running') {
+        Stop-ScheduledTask -TaskName $TaskName
+        for ($Attempt = 0; $Attempt -lt 20; $Attempt++) {
+            if ((Get-ScheduledTask -TaskName $TaskName).State -ne 'Running') { break }
+            Start-Sleep -Milliseconds 250
+        }
+        if ((Get-ScheduledTask -TaskName $TaskName).State -eq 'Running') { throw 'IDE task did not stop for migration.' }
+    }
+    # Preserve logon/boot triggers and stored credentials; add a periodic recovery trigger.
+    $Triggers = @($Task.Triggers | Where-Object { $_.CimClass.CimClassName -ne 'MSFT_TaskTimeTrigger' }) + @(Get-IdeRecoveryTrigger)
+    Set-ScheduledTask -TaskName $TaskName -Action $Desired -Settings (Get-IdeTaskSettings) -Trigger $Triggers | Out-Null
+    Enable-ScheduledTask -TaskName $TaskName | Out-Null
+    if ((Get-ScheduledTask -TaskName $TaskName).State -ne 'Running') { Start-ScheduledTask -TaskName $TaskName }
+}
 
 switch ($Action) {
     'Install' {
@@ -60,9 +100,9 @@ switch ($Action) {
             $ExpectedFrpc = [regex]::Replace($ExpectedFrpc, '(?m)^transport\.tls\.trustedCaFile = .*$', ('transport.tls.trustedCaFile = "' + $ServiceCA + '"'))
             if ((Get-Content -LiteralPath (Join-Path $ServiceRoot 'frpc.toml') -Raw -Encoding UTF8) -cne $ExpectedFrpc -or (Get-FileHash -LiteralPath (Join-Path $ServiceRoot 'ca.pem')).Hash -ne (Get-FileHash -LiteralPath (Join-Path $Root 'ca.pem')).Hash -or (Get-FileHash -LiteralPath (Join-Path $ServiceRoot 'frpc.exe')).Hash -ne (Get-FileHash -LiteralPath (Join-Path $Root 'bin\frpc.exe')).Hash) { throw 'Service copy differs from runtime. Remove services and reinstall after pairing/upgrading.' }
             if ($Headless -and -not ($ExistingTask.Triggers | Where-Object { $_.CimClass.CimClassName -eq 'MSFT_TaskBootTrigger' })) { throw 'Existing task starts at logon. Remove it first to switch to -Headless.' }
-            if ($ExistingTask.State -ne 'Running') { Start-ScheduledTask -TaskName $TaskName }
+            Update-IdeTask $ExistingTask
             if ($ExistingService.Status -ne 'Running') { Start-Service -Name $Name }
-            Write-Host 'Existing services verified; retained task credentials and running sessions.'
+            Write-Host 'Existing services verified; IDE runs without a console, with automatic recovery.'
             break
         }
         # Recover only our own partial registration left by an interrupted install.
@@ -110,13 +150,9 @@ switch ($Action) {
             Invoke-Native $Nssm @('set', $Name, 'AppRotateFiles', '1')
             Invoke-Native $Nssm @('set', $Name, 'AppRotateOnline', '1')
             Invoke-Native $Nssm @('set', $Name, 'AppRotateBytes', '5242880')
-            # Python uses Windows argv quoting, including paths ending in a backslash.
-            $TaskConfig = Get-Content -LiteralPath (Join-Path $Root 'windows-task.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-            $Node = $TaskConfig.executable
-            $TaskArgs = $TaskConfig.arguments
             $User = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-            $TaskAction = New-ScheduledTaskAction -Execute $Node -Argument $TaskArgs -WorkingDirectory $TaskConfig.working_directory
-            $TaskSettings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+            $TaskAction = Get-IdeTaskAction
+            $TaskSettings = Get-IdeTaskSettings
             if ($Headless) {
                 # Task Scheduler stores the password; the script never writes it to disk.
                 $Credential = Get-Credential -UserName $User -Message 'Developer account password for boot-time IDE task (not PIN)'
@@ -124,14 +160,14 @@ switch ($Action) {
                 $Ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password)
                 try {
                     $Plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($Ptr)
-                    Register-ScheduledTask -TaskName $TaskName -Action $TaskAction -Trigger (New-ScheduledTaskTrigger -AtStartup) -Settings $TaskSettings -User $User -Password $Plain -RunLevel Limited | Out-Null
+                    Register-ScheduledTask -TaskName $TaskName -Action $TaskAction -Trigger @((New-ScheduledTaskTrigger -AtStartup), (Get-IdeRecoveryTrigger)) -Settings $TaskSettings -User $User -Password $Plain -RunLevel Limited | Out-Null
                 } finally {
                     $Plain = $null
                     [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($Ptr)
                 }
             } else {
                 $Principal = New-ScheduledTaskPrincipal -UserId $User -LogonType Interactive -RunLevel Limited
-                Register-ScheduledTask -TaskName $TaskName -Action $TaskAction -Trigger (New-ScheduledTaskTrigger -AtLogOn -User $User) -Settings $TaskSettings -Principal $Principal | Out-Null
+                Register-ScheduledTask -TaskName $TaskName -Action $TaskAction -Trigger @((New-ScheduledTaskTrigger -AtLogOn -User $User), (Get-IdeRecoveryTrigger)) -Settings $TaskSettings -Principal $Principal | Out-Null
             }
             Start-ScheduledTask -TaskName $TaskName
             Start-Service -Name $Name
@@ -147,10 +183,12 @@ switch ($Action) {
         Write-Host 'Installed. The default IDE task requires user login; -Headless uses a boot task.'
     }
     'Stop' {
+        Disable-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue | Out-Null
         Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
         Stop-Service -Name $Name -ErrorAction SilentlyContinue
     }
     'Start' {
+        Enable-ScheduledTask -TaskName $TaskName | Out-Null
         Start-ScheduledTask -TaskName $TaskName
         Start-Service -Name $Name
     }

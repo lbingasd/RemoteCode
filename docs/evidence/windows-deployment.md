@@ -42,6 +42,24 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\check-powershell.ps1
 
 本记录不包含 AppSecret、token、配对码、QQ 用户标识、浏览器密码或机器配对包。
 
-## 未验收
+## 2026-10-24：IDE 无窗口守护与自动恢复
+
+本次断开时 frpc 系统服务正常、云端 TLS 通过，本机 IDE 端口拒绝连接。IDE 计划任务上次退出码为 `3221225786`（`0xC000013A / STATUS_CONTROL_C_EXIT`），[微软定义为控制台终止](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/596a1078-e883-4972-9bbc-49e60bebca55)；任务历史日志未启用，不能确认具体操作者或结束方式。没有观察到同一时段的系统重启。旧任务直接启动 Node，仅凭已有失败重试设置未能恢复本次停止。
+
+修复后由 `pythonw.exe` 启动 `windows_ide.py`：IDE 使用 `CREATE_NO_WINDOW`，无论退出码 0 或非 0，均在约 5 秒后重启；Windows Job Object 在守护进程结束时清理 IDE 子进程树，文件锁防止重复守护实例。计划任务保留原有登录/开机触发，并增加无限期每分钟恢复触发，使用 `IgnoreNew` 防止重复启动；主动 Stop 会先禁用任务，Start 再启用。
+
+升级保留现有任务用户及凭据，接受受管理的旧 Node 动作并迁移为新动作；Windows 返回短用户名时先补全本机域再解析 SID，仍检查与安装用户一致。隐藏的 UAC 助手统一写 UTF-8 诊断日志，状态查询继续直接显示结果。
+
+定向自动化：`python -m unittest tests.test_windows_ide tests.test_windows_deployment tests.test_deployment.DeploymentTests.test_ide_uses_token_file_and_matching_base_path` 共 7 项通过。覆盖原生无窗口进程、退出码 7/0 后重启、重复启动保护、父进程终止后子孙进程清理、带空格路径、短用户名 SID 解析、每分钟无限期恢复配置及原有部署回归。PowerShell 三个入口解析与五项 CRT 转义检查通过。测试不注册真实计划任务。
+
+随后在本机现有 IDE 上进行受控测试：
+
+- 核实子进程可执行路径和父 PID 后结束 IDE，原守护进程约 **5.3 秒**内启动新 IDE。
+- 核实守护进程路径和命令后结束守护，计划任务约 **50.8 秒**内启动新守护及 IDE。
+- 两次测试后仅一个 IDE 服务进程；本机 HTTP、云端 TLS 1.3、云端认证入口 HTTP 200 及 workbench 页面标记均通过。
+
+生命周期日志只保存时间、PID、重试和退出码；IDE stdout/stderr 不写入日志，避免保存带 token 的启动地址。测试会终止正在运行的进程，不证明终端命令、模型会话或未保存编辑可在故障后继续。未实测注销/重启/Headless 模式；默认任务仍要求开发用户处于登录状态。
+
+## 其余未验收场景
 
 Windows 重启/注销恢复、Headless 密码任务、完整卸载与升级生命周期、当前 Windows QQ 的手机绑定/审批/截图往返、真实模型工具任务及 iPad 浏览器操作。macOS 上已有的 QQ 验收不能替代这些 Windows 场景。

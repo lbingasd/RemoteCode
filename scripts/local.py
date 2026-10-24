@@ -12,6 +12,7 @@ import shutil
 import socket
 import ssl
 import subprocess
+import sys
 import tempfile
 import urllib.request
 import zipfile
@@ -83,6 +84,13 @@ def write_windows_task(root, config, target=None):
     write((target or root) / "windows-task.json", {
         "executable": command[0], "arguments": subprocess.list2cmdline(command[1:]),
         "working_directory": config["workspace"]})
+    pythonw = Path(sys.executable).with_name('pythonw.exe')
+    if os.name == 'nt':
+        require(pythonw.is_file(), '需要与 Python 同目录的 pythonw.exe 以无窗口运行 IDE')
+    write((target or root) / 'windows-supervisor-task.json', {
+        'executable': str(pythonw),
+        'arguments': subprocess.list2cmdline([str(root / 'windows_ide.py'), '--root', str(root)]),
+        'working_directory': config['workspace']})
 
 
 def restrict_windows(root):
@@ -137,7 +145,7 @@ def install_runtime(root, bundle, lock, cache, workspace, pair):
         write(stage / "local.json", config)
         write(stage / "download.lock.json", lock)
         write_windows_task(root, config, target=stage)
-        for filename in ("local.py", "common.py", "webview_compat.py"):
+        for filename in ("local.py", "common.py", "webview_compat.py", "windows_ide.py"):
             shutil.copy2(Path(__file__).parent / filename, stage / filename)
         # Recheck immediately before replacing an empty target; never merge with user data.
         if root.exists():
