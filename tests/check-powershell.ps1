@@ -1,7 +1,7 @@
 param([string]$Package)
 if (-not $Package) { $Package = Split-Path -Parent $PSScriptRoot }
 $ErrorActionPreference = 'Stop'
-foreach ($Relative in @('deploy-local.ps1', 'deploy-qq.ps1', 'scripts/local-windows.ps1')) {
+foreach ($Relative in @('deploy-local.ps1', 'deploy-qq.ps1', 'scripts/local-windows.ps1', 'scripts/qq-windows.ps1')) {
     $Tokens = $null
     $Errors = $null
     $Ast = [Management.Automation.Language.Parser]::ParseFile((Join-Path $Package $Relative), [ref]$Tokens, [ref]$Errors)

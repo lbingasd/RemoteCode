@@ -196,6 +196,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy-qq.ps1 -Action pair
 
 以上分别用于查状态、修改凭据、重新配对，按需要执行即可。`configured=true` 代表已读到配置，`online=true` 代表网关已 READY，`bound=true` 代表已有接收账号；它们不能单独证明审批/截图已在手机上成功收发。AppSecret 只在自己终端隐藏输入，不放进命令、聊天或日志。
 
+Windows QQ 任务使用 `pythonw.exe` 无窗口守护：Bot 退出后约 5 秒重启，守护进程停止后由每分钟的任务触发恢复；重复触发不会启动多个 Bot。已有安装更新工具包后运行 `.\deploy-qq.ps1 -Action install -NoConfigure` 即可迁移，保留凭据和绑定。主动 `-Action stop` 会先禁用恢复触发，直到 `-Action start` 再启用；`uninstall` 会移除任务。生命周期日志在 `<Root>\logs\qq-supervisor.log`，网关诊断用 `status`；默认仍要求开发用户登录，休眠/注销期间无法保持在线。
+
 ## 脚本说明
 
 | 脚本 | 过程与输入 | 副作用 |
@@ -271,7 +273,7 @@ Windows 用 `-Action 动作`（默认 `install`），Bash 用位置参数动作�
 | `configure` | 交互更新 AppID/AppSecret/沙箱并验证，成功后重启；未绑定则进入配对。已有 AppID/Secret 可留空保留，沙箱仍需按提示选择；切换 AppID 或沙箱环境会清除原绑定 |
 | `pair` | 生成一次性配对码并等待 QQ 私聊；已有绑定时须输入 `REBIND` 才更换接收人 |
 | `status` | 显示配置/在线/绑定状态、事件计数和诊断，不显示凭据；本机服务未运行时返回失败 |
-| `start` / `stop` / `restart` | 控制本机 QQ 服务/任务，不影响 IDE 或 frpc |
+| `start` / `stop` / `restart` | 控制本机 QQ 服务/任务，不影响 IDE 或 frpc；Windows `stop` 同时禁用恢复任务，`start`/`restart` 再启用 |
 | `unbind` | 清除 QQ 绑定、待审批和截图；保留 Bot 配置，可再运行 `pair` |
 | `uninstall` | 移除 QQ 服务、未被自行修改的受管理 agent/skill、QQ 凭据和绑定；保留 IDE/frpc |
 | `-Root DIR` / `--root DIR` | 指向已经安装家庭端的运行目录，必须含 `local.json`；不是本仓库路径 |
@@ -311,7 +313,8 @@ Windows 用 `-Action 动作`（默认 `install`），Bash 用位置参数动作�
 | 云端 443 被占用 | 用 `sudo ss -ltnp 'sport = :443'` 找到占用者；处理现有服务冲突后重跑，不要另建 state 来绕过 |
 | 安装完成但 doctor 失败 | 检查云端 `status`、Windows 服务/任务和网络；自定义路径始终传同一个 `-Root`。Windows frpc 日志在 `%ProgramData%\RemoteCode\<机器标识>\logs`，QQ 日志在 `<Root>\logs\qq.err.log` / `qq.out.log` |
 | frpc 正常但 IDE 任务停止，退出码 `3221225786` / `0xC000013A` | 该退出码表示控制台终止；旧任务直接启动 Node，可能随控制台被结束。更新后重跑相同安装命令迁移为无窗口守护及每分钟恢复任务；查看 `<Root>\logs\ide-supervisor.log`。UAC 服务操作诊断在 `windows-service.log` |
-| QQ 已显示“凭据验证成功”，随后仍提示“请先 configure” | 先用相同 `-Root` 查 `status`。旧版 Windows runner 可能因正常 stderr 输出退出而留下旧 Node 进程；更新后用 `.\deploy-qq.ps1 -Action install -NoConfigure` 重新部署 runner，再运行 `-Action restart` 并查看 `configured`。若仍为 false，需按部署记录核实并处理旧进程，不能只反复输入 Secret 或结束所有 Node 进程 |
+| QQ 已显示“凭据验证成功”，随后仍提示“请先 configure” | 先用相同 `-Root` 查 `status`。旧版 Windows runner 可能提前退出并留下旧 Node 进程；更新后用 `.\deploy-qq.ps1 -Action install -NoConfigure` 迁移到无窗口守护，再查看 `configured`。若仍为 false，需按部署记录核实并处理旧进程，不能只反复输入 Secret 或结束所有 Node 进程 |
+| Windows QQ 计划任务停止后一直离线 | 更新工具包并运行 `.\deploy-qq.ps1 -Action install -NoConfigure`，迁移旧 PowerShell 任务为无窗口守护及每分钟恢复触发。诊断用 `status` 和 `<Root>\logs\qq-supervisor.log`；已主动 `stop` 的任务需要 `start` 才恢复 |
 | QQ 在线但一直等不到绑定 | 私聊正确 AppID/沙箱环境的 Bot，确认 QQ 账号有测试/使用权限，发送终端显示的最新完整绑定命令；检查单聊事件计数，超时后 `pair` 重试 |
 
 安装中断时先解决提示的原因，再使用相同机器、目录和参数重跑；不要删除运行目录来尝试恢复，否则会丢失已有凭据和 IDE 数据。
@@ -323,6 +326,8 @@ Windows 用 `-Action 动作`（默认 `install`），Bash 用位置参数动作�
 2026-10-23 已在 Windows 实机完成家庭端安装、frpc/NSSM 服务与 IDE 计划任务启动、IDE HTTP 与云端 TLS 健康检查，以及 QQ 组件部署、真实凭据校验和网关上线。另通过 25 项 Python 定向测试、34 项 Node QQ 测试和 PowerShell 语法/参数转义检查；详见 [Windows 验证记录](docs/evidence/windows-deployment.md)。自动化 QQ 测试使用模拟 QQ 接口，不能代替手机验收。
 
 2026-10-24 在 Windows 实机验证 IDE 自动恢复：受控终止 IDE 后约 5.3 秒重启，终止守护进程后约 50.8 秒由计划任务恢复；恢复后仅一个 IDE 服务进程，本机及云端认证入口均 HTTP 200。原生恢复、进程树清理和配置定向测试通过，详见同一验证记录。
+
+同日验证 QQ 的无窗口守护与自动恢复：Bot 进程约 5.0 秒、守护任务约 10.2 秒恢复；主动 stop/start、凭据/绑定保留和 IDE 不受影响均通过。23 项 Windows/QQ 定向测试及四个 PowerShell 入口解析通过；真实网关已上线且绑定保留，未据此宣称手机审批或图片往返验收通过。
 
 尚未验收（需目标环境）：Linux Docker 容器运行、RHEL 家族云端自动安装、Linux systemd、Windows 重启/注销/Headless 与完整卸载生命周期、当前 Windows QQ 的手机绑定/审批/截图往返、Codex/Claude/ACP 真实模型任务、iPad Safari/蜂窝网络/长期任务恢复和多物理机切换。已完成的单机检查不代表上述场景全部通过。
 

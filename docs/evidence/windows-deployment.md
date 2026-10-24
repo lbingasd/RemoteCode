@@ -60,6 +60,23 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\check-powershell.ps1
 
 生命周期日志只保存时间、PID、重试和退出码；IDE stdout/stderr 不写入日志，避免保存带 token 的启动地址。测试会终止正在运行的进程，不证明终端命令、模型会话或未保存编辑可在故障后继续。未实测注销/重启/Headless 模式；默认任务仍要求开发用户处于登录状态。
 
+## 2026-10-24：QQ 无窗口守护与自动恢复
+
+本轮开始时 QQ 计划任务为 Ready，最后退出码同样为 `3221225786`，本机 QQ 接口不可用。已将旧 PowerShell runner 迁移为 `pythonw.exe` + `windows_qq.py`，共用 `windows_supervisor.py` 的无窗口、退出重启、进程树清理机制，QQ 使用独立的 `qq-supervisor` 锁/状态/生命周期日志。计划任务保留用户登录边界，新增每分钟无限期恢复触发；主动 stop 先禁用，start 再启用。
+
+自动化：`python -m unittest tests.test_windows_qq tests.test_windows_ide tests.test_windows_deployment tests.test_qq_bot` 共 **23 项通过**。包括原生 QQ wrapper、IDE/QQ 的退出码 0/7 重启和子孙进程清理、无控制台与重复启动保护、带空格路径、旧任务迁移、主动停用/移除和拒绝外部动作/其他任务用户等。四个 PowerShell 入口解析及五项 CRT 转义检查通过。
+
+任务模拟测试曾因 PowerShell 模块自动加载覆盖拦截函数，注册一个仅指向临时目录的测试任务。已按任务名、TEMP 路径、可执行文件和启动参数核实并移除；修正为先加载模块、显式全局拦截并逐条断言，随后全部测试通过。真实 IDE/QQ 任务未在该失败测试中被修改。
+
+实机部署及受控恢复结果：
+
+- 部署前后 `qq/config.json`、`qq/binding.json`、`qq/local-token` 的哈希一致；不输出这些文件内容。
+- 经路径及父 PID 核实后结束 Bot 进程，约 **5.0 秒**恢复；结束 QQ 守护进程后，约 **10.2 秒**由任务恢复，只有一个 Bot 实例。该时间取决于每分钟触发相位，不代表固定恢复耗时。
+- 真实 `stop` 后任务禁用且 Bot/守护进程退出；`start` 后重新上线。
+- 最终 `configured=true, online=true, bound=true`。IDE 守护和 IDE 子进程 PID 与部署前一致，本轮未重启 IDE。
+
+本轮不发送真实 QQ 消息，也不重复验收手机审批/截图往返。正常或异常重启不恢复待审批请求，默认任务仍需用户登录。
+
 ## 其余未验收场景
 
 Windows 重启/注销恢复、Headless 密码任务、完整卸载与升级生命周期、当前 Windows QQ 的手机绑定/审批/截图往返、真实模型工具任务及 iPad 浏览器操作。macOS 上已有的 QQ 验收不能替代这些 Windows 场景。

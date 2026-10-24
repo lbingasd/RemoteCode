@@ -245,29 +245,11 @@ def service(root, action):
                 target.unlink(missing_ok=True)
                 subprocess.run(['systemctl', '--user', 'daemon-reload'], check=True)
     elif os.name == 'nt':
-        # Current-user interactive task, matching the IDE's user/session boundary.
         powershell = str(Path(os.environ['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/powershell.exe')
-        def ps(value):
-            return "'" + str(value).replace("'", "''") + "'"
-        runner = root / 'qq/run-qq.ps1'
-        # Windows PowerShell treats native stderr as error records. Node writes
-        # normal lifecycle messages there; use its exit code to decide failure.
-        write(runner, '$ErrorActionPreference="Continue"\n& ' + ' '.join(ps(x) for x in command)
-              + ' >> ' + ps(logdir / 'qq.out.log') + ' 2>> ' + ps(logdir / 'qq.err.log') + '\nexit $LASTEXITCODE\n')
-        script = '$ErrorActionPreference="Stop"; $n=' + ps(name) + '; $old=Get-ScheduledTask -TaskName $n -ErrorAction SilentlyContinue; '
-        expected = '-NoProfile -ExecutionPolicy Bypass -File "' + str(runner) + '"'
-        script += 'if($old -and ($old.Actions.Count -ne 1 -or $old.Actions[0].Execute -ne ' + ps(powershell) + ' -or $old.Actions[0].Arguments -ne ' + ps(expected) + ')){throw "Task ownership mismatch"}; '
-        if action in ('stop', 'restart', 'remove'):
-            script += 'if($old){Stop-ScheduledTask -TaskName $n}; '
-        if action == 'remove':
-            script += 'if($old){Unregister-ScheduledTask -TaskName $n -Confirm:$false}; '
-        elif action in ('install', 'start', 'restart'):
-            script += '$u=[Security.Principal.WindowsIdentity]::GetCurrent().Name; $a=New-ScheduledTaskAction -Execute ' + ps(powershell) + ' -Argument ' + ps(expected) + '; '
-            script += '$t=New-ScheduledTaskTrigger -AtLogOn -User $u; $p=New-ScheduledTaskPrincipal -UserId $u -LogonType Interactive -RunLevel Limited; '
-            script += '$s=New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries; '
-            script += 'Register-ScheduledTask -TaskName $n -Action $a -Trigger $t -Principal $p -Settings $s -Force | Out-Null; Start-ScheduledTask -TaskName $n; '
-        encoded = base64.b64encode(script.encode('utf-16-le')).decode()
-        subprocess.run([powershell, '-NoProfile', '-EncodedCommand', encoded], check=True)
+        pythonw = Path(sys.executable).with_name('pythonw.exe')
+        subprocess.run([powershell, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+                        str(SOURCE / 'qq-windows.ps1'), '-Action', action, '-Root', str(root),
+                        '-Pythonw', str(pythonw)], check=True, creationflags=subprocess.CREATE_NO_WINDOW)
     else:
         raise ValueError('QQ 服务支持 macOS/Linux/Windows')
 
@@ -279,7 +261,8 @@ def install(root, no_service=False):
     directory = root / 'qq'
     with operation_lock(directory):
         runtime = directory / 'runtime'; runtime.mkdir(exist_ok=True)
-        for name in ('qq_bot.py', 'acp_qq_proxy.py', 'qq-bot.mjs', 'common.py'):
+        for name in ('qq_bot.py', 'acp_qq_proxy.py', 'qq-bot.mjs', 'common.py',
+                     'windows_supervisor.py', 'windows_qq.py', 'qq-windows.ps1'):
             source = SOURCE / name
             target = runtime / name
             if source.resolve() != target.resolve():

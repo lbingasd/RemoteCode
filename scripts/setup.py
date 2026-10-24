@@ -563,7 +563,8 @@ def home_setup(args, root):
         if os.name == "nt":
             from local import write_windows_task
             write_windows_task(root, read(root / 'local.json'))
-            shutil.copy2(SCRIPTS / 'windows_ide.py', root / 'windows_ide.py')
+            for filename in ('windows_ide.py', 'windows_supervisor.py'):
+                shutil.copy2(SCRIPTS / filename, root / filename)
             nssm = prepare_nssm(root, args)
             windows_service(root, "Install", args, nssm)
         else:

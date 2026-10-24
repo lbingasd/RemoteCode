@@ -38,6 +38,22 @@ bash deploy-qq.sh configure --root "$HOME/RemoteCode"
 
 绑定记录写入和 QQ 确认回复分开记录；只有确认回复发送成功才显示“确认回复已发送”，失败时在终端显示数值错误码。绑定成功但手机未收到时，可用 `status` 的 `bound`、`last_message.result=bound_reply_failed` 和 `last_error` 区分接收成功与发送失败。
 
+## Windows 无窗口运行与自动恢复
+
+QQ 任务由 `pythonw.exe` 启动，不再使用带控制台的 PowerShell runner。IDE 与 QQ 的源码共用 Windows 守护模块，分别使用独立的锁、状态文件和日志；不会因 QQ 重启而终止 IDE。Bot 进程正常或异常退出后均约 5 秒重启；守护进程退出后，每分钟的无限期任务触发会恢复运行，`IgnoreNew` 和文件锁防止重复实例。子进程树随守护进程结束清理，避免旧进程占用本机接口。
+
+已有部署在更新工具包后执行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy-qq.ps1 -Action install -NoConfigure
+```
+
+该命令更新组件并迁移原有受管理的 QQ 任务，保留 AppID/AppSecret、绑定和本机 token，不要求重新输入 Secret 或重新绑定。自定义运行目录仍须添加同一 `-Root`。任务动作或用户被自行修改时拒绝覆盖。
+
+主动执行 `-Action stop` 会先禁用任务，随后停止守护与 Bot；不会被每分钟触发器拉起。`start` / `restart` 重新启用；`uninstall` 移除任务。只在任务管理器中结束 Bot 或守护进程则会自动恢复。默认需要开发用户登录，注销、关机、休眠期间不保证在线；待审批请求不会因恢复而重新生效，需按原审批流程重试。
+
+生命周期日志为 `<Root>\logs\qq-supervisor.log`，只保存时间、PID、启动/退出码和重试；不记录 Bot stdout/stderr、QQ 消息或凭据。网关是否 READY 及诊断错误码用 `status` 查看。
+
 ## 在 ACP 中使用
 
 刷新浏览器 IDE，断开原 Codex 或 Claude 连接，选择新增的 **Codex (QQ approvals)** 或 **Claude (QQ approvals)**。它们分别代理现有 `@agentclientprotocol/codex-acp` / `@agentclientprotocol/claude-agent-acp` 的 stdio 连接，不另建模型会话；原 **Codex (local ACP)** 和 **Claude (local ACP)** 条目保留。
@@ -96,7 +112,7 @@ bash deploy-qq.sh uninstall
 
 自定义运行目录时为每条命令添加 `--root DIR`。Windows 使用 `deploy-qq.ps1 -Action ACTION -Root DIR`。`configure` 更新凭据；`pair` 更换接收用户前要求终端输入 `REBIND`；`unbind` 立即取消待审批并清除绑定与截图。
 
-凭据保存在专用运行目录 `qq/config.json`；本机接口访问凭据位于 `qq/local-token`。macOS/Linux QQ 目录权限 0700，敏感文件 0600；Windows 设置当前用户和 SYSTEM 的目录 ACL。运行状态只显示配置/在线/绑定状态和数值错误码，不显示凭据。审计日志 `qq/audit.jsonl` 记录随机编号及状态，不记录命令、截图或 QQ 消息正文。服务诊断日志在 `logs/qq.err.log` / `logs/qq.out.log`。
+凭据保存在专用运行目录 `qq/config.json`；本机接口访问凭据位于 `qq/local-token`。macOS/Linux QQ 目录权限 0700，敏感文件 0600；Windows 设置当前用户和 SYSTEM 的目录 ACL。运行状态只显示配置/在线/绑定状态和数值错误码，不显示凭据。审计日志 `qq/audit.jsonl` 记录随机编号及状态，不记录命令、截图或 QQ 消息正文。macOS 服务输出在 `logs/qq.err.log` / `logs/qq.out.log`；Windows 新守护只写 `logs/qq-supervisor.log` 生命周期记录，历史输出文件可保留但不再追加。
 
 若鉴权出现网络错误，脚本会区分 `TLS_CERT_VERIFY_FAILED`、`DNS_LOOKUP_FAILED`、`CONNECTION_TIMEOUT`、`TLS_HANDSHAKE_FAILED` 和无效响应。macOS 的 python.org Python 可能没有安装 OpenSSL 默认 CA 文件；脚本会加载系统 `/etc/ssl/cert.pem`，保留证书和主机名校验，无需修改全局 Python。显式设置 `SSL_CERT_FILE` / `SSL_CERT_DIR` 时保留该覆盖。任何验证失败均保留已有凭据。
 
@@ -119,6 +135,8 @@ QQ 单独卸载停止服务，删除受管理的 QQ agent/skill、AppSecret、�
 随后重发的真实 QQ 审批往返已通过：用户收到并回复，代理对原 JSON-RPC 审批请求返回 `selected / smoke-allow-once`，模拟 adapter 返回 `QQ_ACP_ROUNDTRIP` 测试标记，本机待审批数为 0。该测试不执行 shell、不修改项目、不调用模型；真实 QQ 人工回复与代理回填已验证，真实 Codex 模型工具执行仍未验收。同时修正代理结束清理时覆盖已决定结果的审计问题：仅未决定请求可以被普通连接取消，已选定结果保留。
 
 2026-10-23 在 Windows 完成 QQ 组件部署、真实凭据校验与网关上线，修复默认编码和 PowerShell 将原生 stderr 当终止错误的问题。清理已核实的旧 Bot 残留进程后状态为 `configured=true, online=true`；本轮没有把手机绑定、审批或截图往返记为已验收。25 项 Python 定向测试和 34 项 Node QQ 测试通过，详情见 [Windows 验证记录](evidence/windows-deployment.md)。
+
+2026-10-24 在当前 Windows 部署无窗口 QQ 守护，实机受控终止 Bot 后约 5.0 秒恢复、终止守护后约 10.2 秒由计划任务恢复。主动 stop/start、无重复 Bot、凭据/绑定/token 哈希一致、IDE PID 不变均通过；最终状态为 `configured=true, online=true, bound=true`。23 项 Windows/QQ 定向测试与四个 PowerShell 入口解析通过。此轮不发送真实 QQ 消息，未重新验收手机审批/截图往返；详见 [Windows 验证记录](evidence/windows-deployment.md)。
 
 - [QQ 鉴权](https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/access-token.html)
 - [QQ API 地址与错误码](https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/api-call-guide.html)

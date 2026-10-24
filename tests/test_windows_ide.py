@@ -48,6 +48,12 @@ def alive(pid):
 @unittest.skipUnless(os.name == 'nt', 'requires native Windows')
 class WindowsIdeTests(unittest.TestCase):
     def test_supervisor_restarts_zero_and_failure_exits_and_cleans_process_tree(self):
+        self.check_supervisor('ide')
+
+    def test_qq_supervisor_restarts_zero_and_failure_exits_and_cleans_process_tree(self):
+        self.check_supervisor('qq')
+
+    def check_supervisor(self, component):
         with tempfile.TemporaryDirectory(prefix='ide recovery ') as folder:
             root = Path(folder)
             probe = root / 'probe.py'
@@ -66,12 +72,12 @@ time.sleep(60)
             runner = root / 'runner.py'
             runner.write_text('import sys\nfrom pathlib import Path\n'
                               + 'sys.path.insert(0,' + repr(str(PACKAGE / 'scripts')) + ')\n'
-                              + 'from windows_ide import supervise\n'
+                              + 'from windows_supervisor import supervise\n'
                               + 'root=Path(__file__).parent\n'
-                              + 'supervise(root,[sys.executable,str(root/"probe.py")],root,retry_delay=.1)\n', encoding='utf-8')
+                              + 'supervise(root,[sys.executable,str(root/"probe.py")],root,retry_delay=.1,component=' + repr(component) + ')\n', encoding='utf-8')
             parent = subprocess.Popen([sys.executable, str(runner)], creationflags=subprocess.CREATE_NO_WINDOW)
             try:
-                state_path = root / 'logs/ide-supervisor.json'
+                state_path = root / f'logs/{component}-supervisor.json'
                 def running_after(count):
                     state = json.loads(state_path.read_text())
                     return state if state['phase'] == 'running' and state['attempts'] >= count else None
@@ -91,7 +97,7 @@ time.sleep(60)
                 parent.kill()
                 parent.wait(timeout=5)
                 wait_for(lambda: not alive(later['child_pid']) and not alive(latest_probe['descendant']))
-                log = (root / 'logs/ide-supervisor.log').read_text()
+                log = (root / f'logs/{component}-supervisor.log').read_text()
                 self.assertIn('code=7', log)
                 self.assertIn('code=0', log)
                 self.assertNotIn('FAKE_SENSITIVE_TOKEN', log)

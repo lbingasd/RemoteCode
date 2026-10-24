@@ -145,7 +145,7 @@ def install_runtime(root, bundle, lock, cache, workspace, pair):
         write(stage / "local.json", config)
         write(stage / "download.lock.json", lock)
         write_windows_task(root, config, target=stage)
-        for filename in ("local.py", "common.py", "webview_compat.py", "windows_ide.py"):
+        for filename in ("local.py", "common.py", "webview_compat.py", "windows_ide.py", "windows_supervisor.py"):
             shutil.copy2(Path(__file__).parent / filename, stage / filename)
         # Recheck immediately before replacing an empty target; never merge with user data.
         if root.exists():
