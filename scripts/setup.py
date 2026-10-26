@@ -506,7 +506,7 @@ def home_setup(args, root):
     if not args.no_agents:
         from agents import resolve_clis
         # Fail before downloading/installing the runtime when prerequisites are absent.
-        cli_paths = resolve_clis(args)
+        cli_paths = resolve_clis(args, root)
     pair = read(args.bundle / "machine.json")
     validate_pair(pair)
     platform_name = host_platform()

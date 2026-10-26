@@ -98,8 +98,46 @@ def find_cli(key, args):
     return None
 
 
-def resolve_clis(args):
+def codex_shim(root, codex_path):
+    """Point Codex CLI at a stable launcher instead of a versioned exe.
+
+    The OpenAI Codex desktop app keeps its CLI under a per-version directory
+    ``%LOCALAPPDATA%\\OpenAI\\Codex\\bin\\<hash>\\codex.exe`` that is rotated on
+    every auto-update. Pinning that absolute path makes ACP entries break after
+    the next update. Return a fixed ``<root>/bin/codex.cmd`` shim that re-resolves
+    the newest such ``codex.exe`` at each launch; return ``None`` for non-Codex-app
+    installs or non-Windows hosts.
+    """
+    if os.name != "nt" or not root or not codex_path:
+        return None
+    resolved = Path(codex_path).resolve()
+    if "OpenAI" not in resolved.parts or "Codex" not in resolved.parts or "bin" not in resolved.parts:
+        return None
+    bin_dir = root / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    shim = bin_dir / "codex.cmd"
+    shim.write_text(
+        r'''@echo off
+set "BIN=%LOCALAPPDATA%\OpenAI\Codex\bin"
+for /f "delims=" %%D in ('dir /b /ad /o-d "%BIN%" 2^>nul') do (
+  if exist "%BIN%\%%D\codex.exe" (
+    "%BIN%\%%D\codex.exe" %*
+    exit /b
+  )
+)
+echo RemoteCode codex shim: no codex.exe found under "%BIN%" 1>&2
+exit /b 127
+''',
+        encoding="ascii",
+    )
+    return str(shim)
+
+
+def resolve_clis(args, root=None):
     resolved = {key: find_cli(key, args) for key in CLIS}
+    shim = codex_shim(root, resolved.get("codex"))
+    if shim:
+        resolved["codex"] = shim
     missing = [key for key, binary in resolved.items() if not binary]
     require(not missing, "缺少或无法执行前置 CLI: " + ", ".join(missing)
             + "；请先确保本机 Codex CLI 和 Claude CLI 可用，并加入 PATH 或指定 --codex-path/--claude-path。")
@@ -182,7 +220,7 @@ def main():
     require(node, "请先安装 Node.js 22+（建议 22 LTS）")
     major = int(subprocess.check_output([node, "--version"], text=True).strip().lstrip("v").split(".")[0])
     require(major >= 22, "ACP adapter 需要 Node.js >=22")
-    resolved = resolve_clis(args)
+    resolved = resolve_clis(args, root)
     agent_dir = root / "agents"
     env = os.environ.copy()
     paths, seen = [str(agent_dir / "node_modules/.bin"), str(Path(node).parent)], set()
